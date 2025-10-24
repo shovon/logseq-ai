@@ -11,17 +11,33 @@
     <script type="module">
       // import "@logseq/libs";
 
+      const providedUiId = "logseq-ai-plugin";
+      const applicationId = "_3rtidhg7fdsg7492";
+      const elementId = `${applicationId}--${providedUiId}`;
+
+      const onAiButtonClick = "onAiButtonClick";
+
       const main = () => {
+        logseq.provideStyle(`
+          #root { display: flex; }
+          .theme-container { flex: 1; }
+        `);
+
         logseq.provideUI({
-          key: "open-calendar",
-          path: "#right-sidebar",
-          template: `
-            <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: black; border: 1px solid red; z-index: 1000; color: white;">
-              <button onclick="alert('abc')' style="opacity: .6; display: inline-flex; padding-left: 3px;'>
-                Your AI stuff will go here.
-              </button>
-            </div>
-          `,
+          key: providedUiId,
+          path: "#root",
+          template: "<div></div>",
+        });
+
+        setTimeout(() => {
+          const element = parent.document.querySelector(`#${elementId} > div`);
+          element.innerHTML = `<button data-on-click="${onAiButtonClick}">This is the AI button</button>`;
+        });
+
+        logseq.provideModel({
+          [onAiButtonClick]() {
+            logseq.App.showMsg("Hello, World!");
+          },
         });
       };
 
