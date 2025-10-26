@@ -6,6 +6,25 @@ A Logseq plugin that adds AI assistance to enhance your note-taking and knowledg
 
 This plugin integrates AI capabilities into your Logseq workflow, allowing you to leverage artificial intelligence directly within your knowledge graph.
 
+## Status
+
+⚠️ **Pre-Alpha**: This plugin is currently in pre-alpha development. Expect bugs, breaking changes, and incomplete features.
+
+⚠️ **API Dependencies**: This plugin is heavily dependent on OpenAI's APIs. Additional AI providers coming soon.
+
+## Setup
+
+### Environment Configuration
+
+Before running the plugin, you must create a `.env` file at the root of the project with your OpenAI API key:
+
+```bash
+# Create .env file at the root
+VITE_OPENAI_API_KEY=your_openai_api_key_here
+```
+
+Replace `your_openai_api_key_here` with your actual OpenAI API key. You can get an API key from [OpenAI's website](https://platform.openai.com/api-keys).
+
 ## Development
 
 ### Prerequisites
