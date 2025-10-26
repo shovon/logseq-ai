@@ -12,23 +12,17 @@ export const useCurrentPageState = (): CurrentPageState => {
     type: "LOADING",
   });
 
-  async function getCurrentPageName(): Promise<string | null> {
-    const p = await logseq.Editor.getCurrentPage();
-
-    if (!p) return null;
-    if (typeof p.name !== "string") return null;
-    return p.name;
-  }
-
   useEffect(() => {
     let isClosed = false;
 
-    getCurrentPageName().then((p) => {
+    logseq.Editor.getCurrentPage().then((p) => {
       if (isClosed) return;
       if (p === null) return;
+      if (typeof p.originalName !== "string") return;
+
       setCurrentPageState({
         type: "LOADED",
-        name: p,
+        name: p.originalName,
       });
     });
 
@@ -41,12 +35,14 @@ export const useCurrentPageState = (): CurrentPageState => {
     let isClosed = false;
     logseq.App.onRouteChanged(() => {
       if (isClosed) return;
-      getCurrentPageName().then((p) => {
+
+      logseq.Editor.getCurrentPage().then((p) => {
         if (isClosed) return;
         if (p === null) return;
+        if (typeof p.originalName !== "string") return;
         setCurrentPageState({
           type: "LOADED",
-          name: p,
+          name: p.originalName,
         });
       });
     });
