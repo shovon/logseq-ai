@@ -2,6 +2,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
 import { useState, useRef, useEffect, useCallback } from "react";
 import type { CoreMessage } from "ai";
+import { useCurrentPageState } from "./useCurrentPageState";
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 
@@ -23,6 +24,7 @@ function App() {
   const [streamingContent, setStreamingContent] = useState<string>("");
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isUserAtBottom, setIsUserAtBottom] = useState<boolean>(true);
+  const currentPageState = useCurrentPageState();
 
   // Check if user is scrolled to bottom
   const checkIfAtBottom = () => {
@@ -151,6 +153,11 @@ function App() {
         {/* Chat input area */}
         <div className="p-4 pt-0">
           <div className="mt-auto border-2 rounded-xl">
+            <div>
+              {currentPageState.type === "LOADED"
+                ? currentPageState.name
+                : null}
+            </div>
             <textarea
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}
@@ -166,7 +173,7 @@ function App() {
               <button
                 onClick={handleSendMessage}
                 disabled={!userInput.trim() || isLoading}
-                className="block px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm"
+                className="block px-3 py-1.5 bg-blue-900 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm font-bold"
               >
                 {isLoading ? "..." : "Send"}
               </button>
