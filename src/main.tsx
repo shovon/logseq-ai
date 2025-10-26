@@ -10,8 +10,6 @@ const providedUiId = "logseq-ai-plugin";
 const applicationId = packageJson.logseq.id;
 const elementId = `${applicationId}--${providedUiId}`;
 
-const onAiButtonClick = "onAiButtonClick";
-
 const main = () => {
   logseq.provideStyle(`
     #root { display: flex; }
@@ -23,12 +21,6 @@ const main = () => {
     path: "#root",
     template:
       '<div style="border: 1px solid red; height: 100vh; min-width: 250px"></div>',
-  });
-
-  logseq.provideModel({
-    [onAiButtonClick]() {
-      logseq.UI.showMsg("Hello, World!");
-    },
   });
 
   setTimeout(() => {
