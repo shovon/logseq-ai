@@ -10,13 +10,42 @@ const openai = createOpenAI({
 
 function App() {
   useEffect(() => {
-    generateText({
-      model: openai("gpt-4"),
-      prompt: "What is love?",
-    });
-  });
+    let isMounted = true;
 
-  return <div className="flex text-red-500">This is really cool</div>;
+    const fetchData = async () => {
+      try {
+        const result = await generateText({
+          model: openai("gpt-4"),
+          prompt: "What is love?",
+        });
+
+        // Only update state if component is still mounted
+        if (isMounted) {
+          console.log("AI Response:", result.text);
+        }
+      } catch (error) {
+        if (isMounted) {
+          console.error("Error generating text:", error);
+        }
+      }
+    };
+
+    fetchData();
+
+    // Cleanup function
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Empty dependency array - only run once
+
+  return (
+    <div className="flex text-gray-800 h-screen min-h-screen items-start justify-end">
+      <aside className="w-480 bg-white bg-opacity-90 shadow-lg h-full min-h-screen border-l-4 border-gradient-to-t from-blue-400 via-purple-400 to-pink-400 p-6 flex flex-col">
+        <h2 className="text-2xl font-bold mb-4">AI Assistant</h2>
+        <div className="flex-1">This is really cool</div>
+      </aside>
+    </div>
+  );
 }
 
 export default App;
