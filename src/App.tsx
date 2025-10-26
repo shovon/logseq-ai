@@ -1,5 +1,5 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import { generateText } from "ai";
+import { streamText } from "ai";
 import { useEffect, useState } from "react";
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
@@ -18,14 +18,16 @@ function App() {
 
     const fetchData = async () => {
       try {
-        const result = await generateText({
+        const result = await streamText({
           model: openai("gpt-4"),
           prompt: "What is love?",
         });
 
-        // Only update state if component is still mounted
-        if (isMounted) {
-          setResponse(result.text);
+        // Stream the text as it comes in
+        for await (const delta of result.textStream) {
+          if (isMounted) {
+            setResponse((prev) => prev + delta);
+          }
         }
       } catch (error) {
         if (isMounted) {
@@ -44,12 +46,11 @@ function App() {
   }, []); // Empty dependency array - only run once
 
   return (
-    <div className="flex text-gray-800 h-screen min-h-screen items-start justify-end">
-      <aside className="w-480 bg-white bg-opacity-90 shadow-lg h-full min-h-screen border-l-4 border-gradient-to-t from-blue-400 via-purple-400 to-pink-400 p-6 flex flex-col">
-        <h2 className="text-2xl font-bold mb-4">AI Assistant</h2>
-        <div className="flex-1">{response || "Loading..."}</div>
-      </aside>
-    </div>
+    <aside className="w-80 text-gray-800 h-screen">
+      <section className="bg-white bg-opacity-90 shadow-lg h-full border-l-4 border-gradient-to-t from-blue-400 via-purple-400 to-pink-400 p-6 flex flex-col overflow-hidden w-full">
+        <div className="flex-1 overflow-auto">{response || "Loading..."}</div>
+      </section>
+    </aside>
   );
 }
 
