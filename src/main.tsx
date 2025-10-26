@@ -20,7 +20,7 @@ const displayUI = () => {
   logseq.provideUI({
     key: providedUiId,
     path: "#root",
-    template: '<div style="width: 250px"></div>',
+    template: '<div style="width: 400px"></div>',
   });
 
   setTimeout(() => {
