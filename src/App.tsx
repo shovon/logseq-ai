@@ -90,9 +90,10 @@ function App() {
         }
 
         // Build a dynamic system prompt with context
-        const systemPromptWithContext = contextString
-          ? `${SYSTEM_PROMPT}\n\nCurrent Context:\n${contextString}`
-          : SYSTEM_PROMPT;
+        const systemPromptWithContext =
+          currentPageState.type === "LOADED"
+            ? `${SYSTEM_PROMPT}\n\nCurrent Context:\n# ${currentPageState.name}\n\n${contextString}`
+            : SYSTEM_PROMPT;
 
         console.log(systemPromptWithContext);
 

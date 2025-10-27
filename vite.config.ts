@@ -4,7 +4,7 @@ import { logseqDevPlugin } from "./vite-plugins/logseq";
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
-  plugins: [tailwindcss(), logseqDevPlugin(), react()],
+  plugins: [tailwindcss({}), logseqDevPlugin(), react()],
   build: {
     target: "esnext",
     minify: "esbuild",
