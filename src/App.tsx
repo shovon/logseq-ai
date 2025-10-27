@@ -21,6 +21,9 @@ function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [userInput, setUserInput] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  // Determine button state
+  const isButtonDisabled = !userInput.trim() || isLoading;
   const [streamingContent, setStreamingContent] = useState<string>("");
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isUserAtBottom, setIsUserAtBottom] = useState<boolean>(true);
@@ -115,7 +118,7 @@ function App() {
   };
 
   return (
-    <aside className="w-80 text-gray-800 h-screen">
+    <aside className="logseq-ai-plugin w-80 text-gray-800 h-screen">
       <section className="bg-white bg-opacity-90 shadow-lg h-full border-l-4 border-gradient-to-t from-blue-400 via-purple-400 to-pink-400 flex flex-col overflow-hidden w-full">
         <div
           ref={scrollContainerRef}
@@ -123,7 +126,9 @@ function App() {
           className="flex-1 overflow-auto p-6 space-y-4"
         >
           {messages.length === 0 && !isLoading && (
-            <div className="text-gray-500 text-center">Ask me anything!</div>
+            <div className="text-gray-500 text-center [&:hover]:text-red-900 [&:hover]:opacity-0 cursor-pointer">
+              Ask me anything!
+            </div>
           )}
           {messages.map((message, index) => (
             <div
@@ -172,8 +177,12 @@ function App() {
               <div className="flex-1"></div>
               <button
                 onClick={handleSendMessage}
-                disabled={!userInput.trim() || isLoading}
-                className="block px-3 py-1.5 bg-blue-900 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm font-bold"
+                disabled={isButtonDisabled}
+                className="block px-3 py-1.5 text-white rounded-lg transition-colors text-sm font-bold disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: isButtonDisabled ? "#d1d5db" : "#1e3a8a",
+                  opacity: isButtonDisabled ? 0.15 : 1,
+                }}
               >
                 {isLoading ? "..." : "Send"}
               </button>
