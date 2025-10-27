@@ -1,7 +1,6 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
 import { useState, useRef, useEffect, useCallback } from "react";
-import type { CoreMessage } from "ai";
 import { useCurrentPageState } from "./useCurrentPageState";
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
@@ -12,8 +11,11 @@ const openai = createOpenAI({
   apiKey: OPENAI_API_KEY,
 });
 
+const SYSTEM_PROMPT =
+  "You are a helpful AI assistant integrated with Logseq. Help users with their questions and tasks.";
+
 interface Message {
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
 }
 
@@ -70,16 +72,36 @@ function App() {
       setStreamingContent(""); // Clear streaming content
 
       // Add user message to conversation
-      const updatedMessages = [
+      const updatedMessages: Message[] = [
         ...messages,
         { role: "user" as const, content: currentInput },
       ];
       setMessages(updatedMessages);
 
       try {
+        // TODO: Replace this with your actual context string
+        let contextString: string | null = null;
+
+        if (currentPageState.type === "LOADED") {
+          const blocks = await logseq.Editor.getPageBlocksTree(
+            currentPageState.name
+          ); // e.g., page content, block content, etc.
+          contextString = blocks.map((b) => b.content).join("\n\n");
+        }
+
+        // Build a dynamic system prompt with context
+        const systemPromptWithContext = contextString
+          ? `${SYSTEM_PROMPT}\n\nCurrent Context:\n${contextString}`
+          : SYSTEM_PROMPT;
+
+        console.log(systemPromptWithContext);
+
         const result = await streamText({
           model: openai("gpt-4"),
-          messages: updatedMessages as CoreMessage[],
+          messages: [
+            { role: "system" as const, content: systemPromptWithContext },
+            ...updatedMessages,
+          ],
         });
 
         let assistantResponse = "";
@@ -116,6 +138,12 @@ function App() {
       handleSendMessage();
     }
   };
+
+  console.log(
+    currentPageState.type === "LOADED"
+      ? currentPageState.name
+      : "----------<No current page>--------------"
+  );
 
   return (
     <aside className="logseq-ai-plugin text-gray-800 h-screen">

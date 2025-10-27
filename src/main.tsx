@@ -3,6 +3,7 @@ import "@logseq/libs";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.tsx";
+import { onReady } from "./ready-service.ts";
 
 const providedUiId = "logseq-ai-plugin";
 let applicationId = logseq.baseInfo.id;
@@ -94,7 +95,7 @@ const main = () => {
   });
 };
 
-logseq.ready(main).catch(console.error);
+onReady(main);
 
 const rootEl = document.getElementById("root");
 if (rootEl) {
