@@ -159,20 +159,18 @@ function App() {
           {messages.map((message, index) => (
             <div
               key={index}
-              className={`p-3 rounded-lg ${
-                message.role === "user"
-                  ? "bg-blue-100 ml-4"
-                  : "bg-gray-100 mr-4"
+              className={`rounded-lg ${
+                message.role === "user" ? "p-3 bg-blue-100 ml-8" : ""
               }`}
             >
-              <div className="font-semibold text-sm mb-1">
+              {/* <div className="font-semibold text-sm mb-1">
                 {message.role === "user" ? "You" : "Assistant"}
-              </div>
+              </div> */}
               <div className="whitespace-pre-wrap">{message.content}</div>
             </div>
           ))}
           {isLoading && (
-            <div className="p-3 rounded-lg bg-gray-100 mr-4">
+            <div className="p-4">
               <div className="font-semibold text-sm mb-1">Assistant</div>
               <div className="whitespace-pre-wrap">
                 {streamingContent || "Thinking..."}
@@ -184,12 +182,12 @@ function App() {
         {/* Chat input area */}
         <div className="p-4 pt-0">
           <div className=" mt-auto rounded-xl bg-gray-100">
-            <div className="px-2 py-1 text-sm text-gray-600">
+            <div className="px-2 py-2 text-xs text-gray-600">
               {currentPageState.type === "LOADED" ? (
                 <>
-                  <span className="bg-gray-200">[[</span>
+                  <span className="text-gray-400">[[</span>
                   {currentPageState.name}
-                  <span className="bg-gray-200">]]</span>
+                  <span className="text-gray-400">]]</span>
                 </>
               ) : null}
             </div>
@@ -220,8 +218,6 @@ function App() {
               </div>
             </div>
           </div>
-
-          <div className="h-12"></div>
         </div>
       </section>
     </aside>
