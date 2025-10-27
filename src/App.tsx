@@ -2,6 +2,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useCurrentPageState } from "./useCurrentPageState";
+import ReactMarkdown from "react-markdown";
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 
@@ -180,14 +181,18 @@ function App() {
               {/* <div className="font-semibold text-sm mb-1">
                 {message.role === "user" ? "You" : "Assistant"}
               </div> */}
-              <div className="whitespace-pre-wrap">{message.content}</div>
+              <div className="prose prose-sm max-w-none [&_p]:my-4 [&_li]:my-2 [&_h1]:mt-6 [&_h1]:mb-4 [&_h2]:mt-5 [&_h2]:mb-3 [&_h3]:mt-4 [&_h3]:mb-3">
+                <ReactMarkdown>{message.content}</ReactMarkdown>
+              </div>
             </div>
           ))}
           {isLoading && (
             <div className="p-4">
               <div className="font-semibold text-sm mb-1">Assistant</div>
-              <div className="whitespace-pre-wrap">
-                {streamingContent || "Thinking..."}
+              <div className="prose prose-sm max-w-none [&_p]:my-4 [&_li]:my-2 [&_h1]:mt-6 [&_h1]:mb-4 [&_h2]:mt-5 [&_h2]:mb-3 [&_h3]:mt-4 [&_h3]:mb-3">
+                <ReactMarkdown>
+                  {streamingContent || "Thinking..."}
+                </ReactMarkdown>
               </div>
             </div>
           )}
