@@ -119,16 +119,14 @@ function App() {
 
   return (
     <aside className="logseq-ai-plugin text-gray-800 h-screen">
-      <section className="bg-white bg-opacity-90 shadow-lg h-full border-l-4 border-gradient-to-t from-blue-400 via-purple-400 to-pink-400 flex flex-col overflow-hidden w-full">
+      <section className="bg-white bg-opacity-90 shadow-lg h-full border-l border-gray-200 flex flex-col overflow-hidden w-full">
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
           className="flex-1 overflow-auto p-6 space-y-4"
         >
           {messages.length === 0 && !isLoading && (
-            <div className="text-gray-500 text-center [&:hover]:text-red-900 [&:hover]:opacity-0 cursor-pointer">
-              Ask me anything!
-            </div>
+            <div className="text-gray-500 text-center">Ask me anything!</div>
           )}
           {messages.map((message, index) => (
             <div
@@ -157,36 +155,41 @@ function App() {
 
         {/* Chat input area */}
         <div className="p-4 pt-0">
-          <div className="mt-auto border-2 rounded-xl">
-            <div>
-              {currentPageState.type === "LOADED"
-                ? currentPageState.name
-                : null}
+          <div className=" mt-auto rounded-xl bg-gray-100">
+            <div className="px-2 py-1 text-sm text-gray-600">
+              {currentPageState.type === "LOADED" ? (
+                <>
+                  <span className="bg-gray-200">[[</span>
+                  {currentPageState.name}
+                  <span className="bg-gray-200">]]</span>
+                </>
+              ) : null}
             </div>
-            <textarea
-              value={userInput}
-              onChange={(e) => setUserInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Type your message here..."
-              className="rounded-xl flex-1 resize-none border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none block"
-              rows={2}
-              disabled={isLoading}
-              style={{ outline: "none", boxShadow: "none" }}
-            />
-            <div className="flex p-1">
-              <div className="flex-1"></div>
-              <button
-                onClick={handleSendMessage}
-                disabled={isButtonDisabled}
-                className="block px-3 py-1.5 text-white rounded-lg text-sm font-bold disabled:cursor-not-allowed"
-                style={{
-                  display: "block",
-                  backgroundColor: isButtonDisabled ? "grey" : "#1e3a8a",
-                  opacity: isButtonDisabled ? 0.5 : 1,
-                }}
-              >
-                {isLoading ? "..." : "Send"}
-              </button>
+            <div className="bg-white border-2 border-gray-200 rounded-xl">
+              <textarea
+                value={userInput}
+                onChange={(e) => setUserInput(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Type your message here..."
+                className="w-full rounded-xl flex-1 resize-none border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none block p-2"
+                rows={2}
+                disabled={isLoading}
+                style={{ outline: "none", boxShadow: "none" }}
+              />
+              <div className="flex p-2">
+                <div className="flex-1"></div>
+                <button
+                  onClick={handleSendMessage}
+                  disabled={isButtonDisabled}
+                  className="block px-3 py-1.5 text-white rounded-lg text-sm font-bold disabled:cursor-not-allowed"
+                  style={{
+                    backgroundColor: isButtonDisabled ? "grey" : "#1e3a8a",
+                    opacity: isButtonDisabled ? 0.5 : 1,
+                  }}
+                >
+                  {isLoading ? "..." : "Send"}
+                </button>
+              </div>
             </div>
           </div>
 
