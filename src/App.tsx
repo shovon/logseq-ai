@@ -118,7 +118,7 @@ function App() {
   };
 
   return (
-    <aside className="logseq-ai-plugin w-80 text-gray-800 h-screen">
+    <aside className="logseq-ai-plugin text-gray-800 h-screen">
       <section className="bg-white bg-opacity-90 shadow-lg h-full border-l-4 border-gradient-to-t from-blue-400 via-purple-400 to-pink-400 flex flex-col overflow-hidden w-full">
         <div
           ref={scrollContainerRef}
@@ -178,10 +178,11 @@ function App() {
               <button
                 onClick={handleSendMessage}
                 disabled={isButtonDisabled}
-                className="block px-3 py-1.5 text-white rounded-lg transition-colors text-sm font-bold disabled:cursor-not-allowed"
+                className="block px-3 py-1.5 text-white rounded-lg text-sm font-bold disabled:cursor-not-allowed"
                 style={{
-                  backgroundColor: isButtonDisabled ? "#d1d5db" : "#1e3a8a",
-                  opacity: isButtonDisabled ? 0.15 : 1,
+                  display: "block",
+                  backgroundColor: isButtonDisabled ? "grey" : "#1e3a8a",
+                  opacity: isButtonDisabled ? 0.5 : 1,
                 }}
               >
                 {isLoading ? "..." : "Send"}

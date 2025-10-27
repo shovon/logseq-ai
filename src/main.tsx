@@ -1,17 +1,13 @@
 import "@logseq/libs";
 
-import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.tsx";
-import packageJson from "../package.json";
 
 const providedUiId = "logseq-ai-plugin";
-const applicationId = packageJson.logseq.id;
-const elementId = `${applicationId}--${providedUiId}`;
+let applicationId = logseq.baseInfo.id;
+let elementId = `${applicationId}--${providedUiId}`;
 
-let reactRoot: ReturnType<typeof createRoot> | null = null;
-let observer: MutationObserver | null = null;
 let isShowing = false;
 
 const displayUI = () => {
@@ -23,58 +19,13 @@ const displayUI = () => {
     template: '<div style="width: 400px"></div>',
   });
 
-  setTimeout(() => {
-    const element = parent.document.querySelector(`#${elementId} > div`);
-    if (!element) {
-      logseq.UI.showMsg("Failed to find DOM element for React root", "error");
-      return;
-    }
-
-    reactRoot = createRoot(element);
-    reactRoot.render(
-      <StrictMode>
-        <App />
-      </StrictMode>
-    );
-
-    // Watch for DOM element removal
-    observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        mutation.removedNodes.forEach((node) => {
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            const elementNode = node as Element;
-            if (
-              elementNode.id === elementId ||
-              elementNode.querySelector(`#${elementId}`)
-            ) {
-              hideUI();
-            }
-          }
-        });
-      });
-    });
-
-    observer.observe(parent.document.body, {
-      childList: true,
-      subtree: true,
-    });
-  });
+  logseq.showMainUI();
 };
 
 const hideUI = () => {
   isShowing = false;
 
-  // Clean up React root when UI is hidden
-  if (reactRoot) {
-    reactRoot.unmount();
-    reactRoot = null;
-  }
-
-  // Clean up observer
-  if (observer) {
-    observer.disconnect();
-    observer = null;
-  }
+  logseq.hideMainUI();
 
   logseq.provideUI({
     key: providedUiId,
@@ -84,9 +35,21 @@ const hideUI = () => {
 };
 
 const main = () => {
-  // displayUI();
+  applicationId = logseq.baseInfo.id;
+  elementId = `${applicationId}--${providedUiId}`;
+  console.log(applicationId);
 
   const iconName = `${elementId}-toolbar-icon`;
+  console.log(iconName);
+
+  logseq.setMainUIInlineStyle({
+    position: "absolute",
+    zIndex: 11,
+    width: "400px",
+    top: "0",
+    left: "calc(100vw - 400px)",
+    height: "100vh",
+  });
 
   logseq.provideStyle(`
     #root { display: flex; }
@@ -112,6 +75,15 @@ const main = () => {
     },
   });
 
+  logseq.provideStyle(`
+    #injected-ui-item-${iconName}-${applicationId} {
+      display: flex;
+      align-items: center;
+      font-weight: 500;
+      position: relative;
+    }
+  `);
+
   logseq.App.registerUIItem("toolbar", {
     key: iconName,
     template: `
@@ -123,3 +95,8 @@ const main = () => {
 };
 
 logseq.ready(main).catch(console.error);
+
+const rootEl = document.getElementById("root");
+if (rootEl) {
+  createRoot(rootEl).render(<App />);
+}
