@@ -139,12 +139,6 @@ function App() {
     }
   };
 
-  console.log(
-    currentPageState.type === "LOADED"
-      ? currentPageState.name
-      : "----------<No current page>--------------"
-  );
-
   return (
     <aside className="logseq-ai-plugin text-gray-800 h-screen">
       <section className="bg-white bg-opacity-90 shadow-lg h-full border-l border-gray-200 flex flex-col overflow-hidden w-full">
@@ -160,7 +154,7 @@ function App() {
             <div
               key={index}
               className={`rounded-lg ${
-                message.role === "user" ? "p-3 bg-blue-100 ml-8" : ""
+                message.role === "user" ? "p-3 bg-blue-50 ml-8" : ""
               }`}
             >
               {/* <div className="font-semibold text-sm mb-1">
