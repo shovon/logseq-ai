@@ -16,10 +16,13 @@
     "@logseq/libs": "^0.0.17",
     "@tailwindcss/vite": "^4.1.16",
     "ai": "^5.0.79",
+    "katex": "^0.16.25",
     "magic-string": "^0.30.21",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-markdown": "^10.1.0",
+    "rehype-katex": "^7.0.1",
+    "remark-math": "^6.0.0",
     "tailwindcss": "^4.1.16"
   },
   "devDependencies": {
