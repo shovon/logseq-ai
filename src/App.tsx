@@ -87,6 +87,25 @@ function App() {
             currentPageState.name
           ); // e.g., page content, block content, etc.
           contextString = blocks.map((b) => b.content).join("\n\n");
+
+          const links =
+            (await logseq.Editor.getPageLinkedReferences(
+              currentPageState.name
+            )) ?? [];
+
+          if (links.length > 0) {
+            contextString += "\n\n## Backlinks";
+            for (const link of links) {
+              for (const block of link[1]) {
+                if (
+                  block.content &&
+                  block.content.includes(`[[${currentPageState.name}]]`)
+                ) {
+                  contextString += "\n\n" + block.content;
+                }
+              }
+            }
+          }
         }
 
         // Build a dynamic system prompt with context
