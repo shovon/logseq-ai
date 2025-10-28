@@ -239,8 +239,7 @@ function App() {
             </div>
           ))}
           {isLoading && (
-            <div className="p-4">
-              <div className="font-semibold text-sm mb-1">Assistant</div>
+            <div className="rounded-lg">
               <div className="prose prose-sm max-w-none [&_p]:my-4 [&_li]:my-2 [&_h1]:mt-6 [&_h1]:mb-4 [&_h2]:mt-5 [&_h2]:mb-3 [&_h3]:mt-4 [&_h3]:mb-3 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
                 <ReactMarkdown
                   remarkPlugins={[remarkMath]}
