@@ -15,8 +15,9 @@ const openai = createOpenAI({
   apiKey: OPENAI_API_KEY,
 });
 
-const SYSTEM_PROMPT =
-  "You are a helpful AI assistant integrated with Logseq. Help users with their questions and tasks.";
+const SYSTEM_PROMPT = `You are a helpful AI assistant integrated with Logseq. Help users with their questions and tasks.
+
+Just note, when a user uses the \`[[SOME PAGE NAME]]\` syntax, they are referring to a page, and you can find it in the page references list.`;
 
 interface Message {
   role: "user" | "assistant" | "system";
@@ -72,6 +73,13 @@ function App() {
 
       setIsLoading(true);
       const currentInput = userInput;
+
+      // Extract strings from [[...]] format
+      const extractedBrackets = (
+        currentInput.match(/\[\[([^\]]+)\]\]/g) || []
+      ).map((match) => match.slice(2, -2)); // Remove [[ and ]]
+      console.log("Extracted brackets:", extractedBrackets);
+
       setUserInput(""); // Clear input
       setStreamingContent(""); // Clear streaming content
 
@@ -83,7 +91,6 @@ function App() {
       setMessages(updatedMessages);
 
       try {
-        // TODO: Replace this with your actual context string
         let contextString: string | null = null;
 
         if (currentPageState.type === "LOADED") {
@@ -112,11 +119,48 @@ function App() {
           }
         }
 
+        // Extract page content from here.
+        const extractedPagesContent = [];
+        for (const pageName of extractedBrackets) {
+          console.log(pageName);
+          try {
+            const blocks = await logseq.Editor.getPageBlocksTree(pageName);
+            const pageContent = blocks.map((b) => b.content).join("\n\n");
+
+            console.log(pageContent);
+
+            const backlinks =
+              (await logseq.Editor.getPageLinkedReferences(pageName)) ?? [];
+
+            extractedPagesContent.push({
+              pageName,
+              content: pageContent,
+              backlinks: backlinks
+                .map((link) => link[1].map((block) => block.content))
+                .flat(),
+            });
+          } catch (error) {
+            console.log(`Error fetching page ${pageName}:`, error);
+          }
+        }
+        console.log("Extracted pages content:", extractedPagesContent);
+
         // Build a dynamic system prompt with context
-        const systemPromptWithContext =
+        let systemPromptWithContext =
           currentPageState.type === "LOADED"
-            ? `${SYSTEM_PROMPT}\n\nCurrent Context:\n# ${currentPageState.name}\n\n${contextString}`
+            ? `${SYSTEM_PROMPT}\n\nCurrent Page:\n# ${currentPageState.name}\n\n${contextString}`
             : SYSTEM_PROMPT;
+
+        // Add referenced pages to the context
+        if (extractedPagesContent.length > 0) {
+          let referencedPagesSection = "\n\n## Referenced Pages\n";
+          for (const page of extractedPagesContent) {
+            referencedPagesSection += `\nPage Name: ${
+              page.pageName
+            }\n\n## Backlinks\n${page.content}\n${page.backlinks.join("\n\n")}`;
+          }
+          systemPromptWithContext += referencedPagesSection;
+        }
 
         console.log(systemPromptWithContext);
 
