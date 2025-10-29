@@ -6,7 +6,7 @@ import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
-import { onReady } from "./ready-service";
+// import { onReady } from "./ready-service";
 import { getAllChatThreads } from "./querier";
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
@@ -26,16 +26,13 @@ interface Message {
   content: string;
 }
 
-type AppView =
-  | { type: "NEW_CHAT" }
-  | { type: "CHAT_HISTORY" }
-  | { type: "CHAT_THREAD" };
+type AppView = { type: "CHAT_HISTORY" } | { type: "CHAT_THREAD" };
 
 function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [userInput, setUserInput] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [viewState, setViewState] = useState<AppView>({ type: "NEW_CHAT" });
+  const [viewState, setViewState] = useState<AppView>({ type: "CHAT_THREAD" });
 
   // Determine button state
   const isButtonDisabled = !userInput.trim() || isLoading;
@@ -75,25 +72,25 @@ function App() {
     scrollToBottom();
   }, [messages.length, scrollToBottom]);
 
-  useEffect(() => {
-    onReady(() => {
-      setInterval(() => {
-        getAllChatThreads().then(async (pages) => {
-          console.log("All chat threads:", pages);
+  // useEffect(() => {
+  //   onReady(() => {
+  //     setInterval(() => {
+  //       getAllChatThreads().then(async (pages) => {
+  //         console.log("All chat threads:", pages);
 
-          for (const page of pages) {
-            console.log(
-              "Chat thread",
-              page.uuid,
-              (await logseq.Editor.getPageBlocksTree(page.uuid)).filter(
-                (block) => typeof block.properties?.role === "string"
-              )
-            );
-          }
-        });
-      }, 5000); // Increased interval to 5 seconds to avoid spam
-    });
-  }, []);
+  //         for (const page of pages) {
+  //           console.log(
+  //             "Chat thread",
+  //             page.uuid,
+  //             (await logseq.Editor.getPageBlocksTree(page.uuid)).filter(
+  //               (block) => typeof block.properties?.role === "string"
+  //             )
+  //           );
+  //         }
+  //       });
+  //     }, 5000); // Increased interval to 5 seconds to avoid spam
+  //   });
+  // }, []);
 
   const handleSendMessage = () => {
     (async () => {
@@ -236,7 +233,7 @@ function App() {
   };
 
   const navigateToNewChat = () => {
-    setViewState({ type: "NEW_CHAT" });
+    setViewState({ type: "CHAT_THREAD" });
     setMessages([]);
     setUserInput("");
   };
@@ -317,7 +314,7 @@ function App() {
           <button
             onClick={navigateToNewChat}
             className={`px-3 py-2 text-sm font-medium rounded-lg mr-2 ${
-              viewState.type === "NEW_CHAT" || viewState.type === "CHAT_THREAD"
+              viewState.type === "CHAT_THREAD"
                 ? "bg-blue-500 text-white"
                 : "bg-gray-200 text-gray-700 hover:bg-gray-300"
             }`}
