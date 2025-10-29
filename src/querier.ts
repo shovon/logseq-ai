@@ -2,6 +2,11 @@ import z from "zod";
 
 // Note: this comment on GitHub helped a lot.
 
+// A lot of datalog querying going on.
+//
+// This page helped me prompt engineer my way into finding the right query:
+// https://docs.logseq.com/#/page/advanced%20queries
+
 const PageType = z.object({
   name: z.string().optional(),
   uuid: z.string(),
