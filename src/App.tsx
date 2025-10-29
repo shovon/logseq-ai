@@ -22,6 +22,19 @@ const SYSTEM_PROMPT = `You are a helpful AI assistant integrated with Logseq. He
 
 Just note, when a user uses the \`[[SOME PAGE NAME]]\` syntax, they are referring to a page, and you can find it in the page references list.`;
 
+// Filter out lines matching "key:: value\n" pattern
+const filterPropertyLines = (content: string): string => {
+  return content
+    .split("\n")
+    .filter((line) => {
+      // Match lines that have the pattern "key:: value" (but allow the value to be empty or have spaces)
+      // This regex matches: any characters, followed by "::", followed by optional whitespace and value
+      const propertyPattern = /^[^:]+::\s*.+$/;
+      return !propertyPattern.test(line);
+    })
+    .join("\n");
+};
+
 type AppView = { type: "CHAT_HISTORY" } | { type: "CHAT_THREAD" };
 
 function App() {
@@ -67,26 +80,6 @@ function App() {
   useEffect(() => {
     scrollToBottom();
   }, [messages.length, scrollToBottom]);
-
-  // useEffect(() => {
-  //   onReady(() => {
-  //     setInterval(() => {
-  //       getAllChatThreads().then(async (pages) => {
-  //         console.log("All chat threads:", pages);
-
-  //         for (const page of pages) {
-  //           console.log(
-  //             "Chat thread",
-  //             page.uuid,
-  //             (await logseq.Editor.getPageBlocksTree(page.uuid)).filter(
-  //               (block) => typeof block.properties?.role === "string"
-  //             )
-  //           );
-  //         }
-  //       });
-  //     }, 5000); // Increased interval to 5 seconds to avoid spam
-  //   });
-  // }, []);
 
   const handleSendMessage = () => {
     (async () => {
@@ -366,7 +359,7 @@ function App() {
                       remarkPlugins={[remarkMath]}
                       rehypePlugins={[rehypeKatex]}
                     >
-                      {message.content}
+                      {filterPropertyLines(message.content)}
                     </ReactMarkdown>
                   </div>
                 </div>
@@ -378,7 +371,7 @@ function App() {
                       remarkPlugins={[remarkMath]}
                       rehypePlugins={[rehypeKatex]}
                     >
-                      {streamingContent || "Thinking..."}
+                      {filterPropertyLines(streamingContent || "Thinking...")}
                     </ReactMarkdown>
                   </div>
                 </div>
