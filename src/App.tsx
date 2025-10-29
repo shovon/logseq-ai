@@ -22,15 +22,30 @@ const SYSTEM_PROMPT = `You are a helpful AI assistant integrated with Logseq. He
 
 Just note, when a user uses the \`[[SOME PAGE NAME]]\` syntax, they are referring to a page, and you can find it in the page references list.`;
 
-// Filter out lines matching "key:: value\n" pattern
+// Filter out lines matching "key:: value\n" pattern that are contiguously
+// placed in the header
 const filterPropertyLines = (content: string): string => {
-  return content
-    .split("\n")
+  const lines = content.split("\n");
+  const propertyPattern = /^[^:]+::\s*.+$/;
+  let headerEnded = false;
+
+  return lines
     .filter((line) => {
-      // Match lines that have the pattern "key:: value" (but allow the value to be empty or have spaces)
-      // This regex matches: any characters, followed by "::", followed by optional whitespace and value
-      const propertyPattern = /^[^:]+::\s*.+$/;
-      return !propertyPattern.test(line);
+      // If we've already passed the header section, keep all lines
+      if (headerEnded) {
+        return true;
+      }
+
+      // Check if this line is a property line
+      const isPropertyLine = propertyPattern.test(line);
+
+      // If it's a property line, remove it (we're still in the header)
+      // If it's not a property line, keep it and mark that the header has ended
+      if (!isPropertyLine) {
+        headerEnded = true;
+      }
+
+      return !isPropertyLine;
     })
     .join("\n");
 };
