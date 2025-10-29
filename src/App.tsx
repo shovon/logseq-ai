@@ -7,13 +7,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { onReady } from "./ready-service";
-import {
-  getAllPages,
-  getPageUuid,
-  getPagesByProperty,
-  getPagesWithProperty,
-  getAllChatThreads,
-} from "./querier";
+import { getAllChatThreads } from "./querier";
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 
@@ -84,24 +78,19 @@ function App() {
   useEffect(() => {
     onReady(() => {
       setInterval(() => {
-        console.log("Testing datascript queries");
-        getPageUuid("[[Logseq AI Plugin]]").then(console.log);
+        getAllChatThreads().then(async (pages) => {
+          console.log("All chat threads:", pages);
 
-        // Test property queries
-        console.log("Testing property queries:");
-        getPagesByProperty("type", "Logseq AI Chat Thread").then((pages) => {
-          console.log("Pages with type='Logseq AI Chat Thread':", pages);
+          for (const page of pages) {
+            console.log(
+              "Chat thread",
+              page.uuid,
+              (await logseq.Editor.getPageBlocksTree(page.uuid)).filter(
+                (block) => typeof block.properties?.role === "string"
+              )
+            );
+          }
         });
-
-        getPagesWithProperty("type").then((pages) => {
-          console.log("Pages with 'type' property:", pages);
-        });
-
-        getAllPages().then((pages) => console.log("All pages:", pages));
-
-        getAllChatThreads().then((pages) =>
-          console.log("All chat threads:", pages)
-        );
       }, 5000); // Increased interval to 5 seconds to avoid spam
     });
   }, []);
