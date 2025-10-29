@@ -7,7 +7,8 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 // import { onReady } from "./ready-service";
-import { getAllChatThreads } from "./querier";
+import { getAllChatThreads, loadThreadMessages } from "./querier";
+import type { Message } from "./querier";
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 
@@ -20,11 +21,6 @@ const openai = createOpenAI({
 const SYSTEM_PROMPT = `You are a helpful AI assistant integrated with Logseq. Help users with their questions and tasks.
 
 Just note, when a user uses the \`[[SOME PAGE NAME]]\` syntax, they are referring to a page, and you can find it in the page references list.`;
-
-interface Message {
-  role: "user" | "assistant" | "system";
-  content: string;
-}
 
 type AppView = { type: "CHAT_HISTORY" } | { type: "CHAT_THREAD" };
 
@@ -242,7 +238,16 @@ function App() {
     setViewState({ type: "CHAT_HISTORY" });
   };
 
-  const navigateToThread = () => {
+  const navigateToThread = async (threadUuid?: string) => {
+    if (threadUuid) {
+      try {
+        const loadedMessages = await loadThreadMessages(threadUuid);
+        setMessages(loadedMessages);
+      } catch (error) {
+        console.error("Error loading thread messages:", error);
+        logseq.UI.showMsg("Error loading thread messages", "error");
+      }
+    }
     setViewState({ type: "CHAT_THREAD" });
   };
 
@@ -287,7 +292,7 @@ function App() {
             chatThreads.map((thread, index) => (
               <div
                 key={thread.uuid || index}
-                onClick={navigateToThread}
+                onClick={() => navigateToThread(thread.uuid)}
                 className="p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
               >
                 <div className="font-medium text-gray-800">

@@ -16,6 +16,11 @@ const PageType = z.object({
 
 type PageType = z.infer<typeof PageType>;
 
+export interface Message {
+  role: "user" | "assistant" | "system";
+  content: string;
+}
+
 export const getAllChatThreads = async (): Promise<PageType[]> => {
   const result = await logseq.DB.datascriptQuery(`
     [:find (pull ?p [*])
@@ -29,4 +34,25 @@ export const getAllChatThreads = async (): Promise<PageType[]> => {
   const pages = z.union([z.array(z.array(PageType)), z.null()]).parse(result);
 
   return (pages ?? []).flat();
+};
+
+export const loadThreadMessages = async (
+  pageUuid: string
+): Promise<Message[]> => {
+  const blocks = await logseq.Editor.getPageBlocksTree(pageUuid);
+
+  // Filter top-level blocks with role property set to "user" or "assistant"
+  const messageBlocks = blocks.filter(
+    (block) =>
+      block.properties?.role === "user" ||
+      block.properties?.role === "assistant"
+  );
+
+  // Convert blocks to Message objects, preserving order
+  const messages: Message[] = messageBlocks.map((block) => ({
+    role: block.properties!.role as "user" | "assistant",
+    content: block.content,
+  }));
+
+  return messages;
 };
