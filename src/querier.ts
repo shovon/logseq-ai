@@ -1,6 +1,7 @@
 import z from "zod";
 
-// Note: this comment on GitHub helped a lot.
+// Note: this comment on GitHub helped a lot:
+// https://github.com/logseq/plugins/issues/30#issuecomment-2926495102
 
 // A lot of datalog querying going on.
 //
