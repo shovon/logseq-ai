@@ -1,4 +1,5 @@
-import z from "zod";
+import type { BlockEntity } from "@logseq/libs/dist/LSPlugin.user";
+import { z } from "zod";
 
 // Note: this comment on GitHub helped a lot:
 // https://github.com/logseq/plugins/issues/30#issuecomment-2926495102
@@ -16,8 +17,15 @@ const PageType = z.object({
 
 type PageType = z.infer<typeof PageType>;
 
+type Role = "user" | "assistant" | "system";
+const Role: z.ZodSchema<Role> = z.union([
+  z.literal("user"),
+  z.literal("assistant"),
+  z.literal("system"),
+]);
+
 export interface Message {
-  role: "user" | "assistant" | "system";
+  role: Role;
   content: string;
 }
 
@@ -36,7 +44,7 @@ export const getAllChatThreads = async (): Promise<PageType[]> => {
   return (pages ?? []).flat();
 };
 
-export const loadThreadMessages = async (
+export const loadThreadMessageBlock = async (
   pageUuid: string
 ): Promise<Message[]> => {
   const blocks = await logseq.Editor.getPageBlocksTree(pageUuid);

@@ -7,7 +7,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 // import { onReady } from "./ready-service";
-import { getAllChatThreads, loadThreadMessages } from "./querier";
+import { getAllChatThreads, loadThreadMessageBlock } from "./querier";
 import type { Message } from "./querier";
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
@@ -249,7 +249,7 @@ function App() {
   const navigateToThread = async (threadUuid?: string) => {
     if (threadUuid) {
       try {
-        const loadedMessages = await loadThreadMessages(threadUuid);
+        const loadedMessages = await loadThreadMessageBlock(threadUuid);
         setMessages(loadedMessages);
       } catch (error) {
         console.error("Error loading thread messages:", error);
