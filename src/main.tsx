@@ -38,10 +38,8 @@ const hideUI = () => {
 const main = () => {
   applicationId = logseq.baseInfo.id;
   elementId = `${applicationId}--${providedUiId}`;
-  console.log(applicationId);
 
   const iconName = `${elementId}-toolbar-icon`;
-  console.log(iconName);
 
   logseq.setMainUIInlineStyle({
     position: "absolute",
