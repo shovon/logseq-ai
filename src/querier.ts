@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { filterPropertyLines } from "./utils";
+import type { BlockEntity } from "@logseq/libs/dist/LSPlugin.user";
 
 // Note: this comment on GitHub helped a lot:
 // https://github.com/logseq/plugins/issues/30#issuecomment-2926495102
@@ -24,10 +25,15 @@ const Role: z.ZodSchema<Role> = z.union([
   z.literal("system"),
 ]);
 
-export interface Message {
+export type Message = {
   role: Role;
   content: string;
-}
+};
+
+export type BlockMessage = {
+  message: Message;
+  block: BlockEntity;
+};
 
 export const getAllChatThreads = async (): Promise<PageType[]> => {
   const result = await logseq.DB.datascriptQuery(`
@@ -46,7 +52,7 @@ export const getAllChatThreads = async (): Promise<PageType[]> => {
 
 export const loadThreadMessageBlocks = async (
   pageUuid: string
-): Promise<Message[]> => {
+): Promise<BlockMessage[]> => {
   const blocks = await logseq.Editor.getPageBlocksTree(pageUuid);
 
   // Filter top-level blocks with role property set to "user" or "assistant"
@@ -57,9 +63,12 @@ export const loadThreadMessageBlocks = async (
   );
 
   // Convert blocks to Message objects, preserving order
-  const messages: Message[] = messageBlocks.map((block) => ({
-    role: block.properties!.role as "user" | "assistant",
-    content: filterPropertyLines(block.content),
+  const messages: BlockMessage[] = messageBlocks.map((block) => ({
+    block,
+    message: {
+      role: block.properties!.role as "user" | "assistant",
+      content: filterPropertyLines(block.content),
+    },
   }));
 
   return messages;
@@ -75,7 +84,7 @@ export const createChatThreadPage = async (
   const page = await logseq.Editor.createPage(
     pageTitle,
     { type: "logseq ai chat thread" },
-    { createFirstBlock: false }
+    { createFirstBlock: false, redirect: false }
   );
 
   if (!page) {

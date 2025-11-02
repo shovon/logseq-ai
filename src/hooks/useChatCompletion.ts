@@ -45,8 +45,10 @@ export function useChatCompletion(
 
     setStreamingContent("");
 
+    const newMessage = { role: "user" as const, content: input };
+
     // Add user message to conversation
-    chatThread.addMessage({ role: "user" as const, content: input });
+    chatThread.addMessage(newMessage);
 
     // Handle thread storage
     let threadUuid = chatThread.currentThreadPageUuid;
@@ -57,10 +59,7 @@ export function useChatCompletion(
       }
 
       // Store user message
-      await chatThread.appendMessage({
-        role: "user",
-        content: input,
-      });
+      await chatThread.appendMessage(newMessage);
     } catch (error) {
       console.error("Error storing user message:", error);
     }
@@ -74,7 +73,9 @@ export function useChatCompletion(
       }
 
       // Build referenced pages context
-      const extractedPagesContent = await buildReferencedPagesContext(extractedBrackets);
+      const extractedPagesContent = await buildReferencedPagesContext(
+        extractedBrackets
+      );
       console.log("Extracted pages content:", extractedPagesContent);
 
       // Build system prompt with context
@@ -89,7 +90,7 @@ export function useChatCompletion(
         extractedPagesContent
       );
 
-      console.log(systemPromptWithContext);
+      console.log(systemPromptWithContext, chatThread.messages);
 
       // Stream AI response
       const result = await streamText({
@@ -97,6 +98,7 @@ export function useChatCompletion(
         messages: [
           { role: "system" as const, content: systemPromptWithContext },
           ...chatThread.messages,
+          newMessage,
         ],
       });
 
