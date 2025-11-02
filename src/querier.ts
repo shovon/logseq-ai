@@ -1,5 +1,5 @@
-import type { BlockEntity } from "@logseq/libs/dist/LSPlugin.user";
 import { z } from "zod";
+import { filterPropertyLines } from "./utils";
 
 // Note: this comment on GitHub helped a lot:
 // https://github.com/logseq/plugins/issues/30#issuecomment-2926495102
@@ -44,7 +44,7 @@ export const getAllChatThreads = async (): Promise<PageType[]> => {
   return (pages ?? []).flat();
 };
 
-export const loadThreadMessageBlock = async (
+export const loadThreadMessageBlocks = async (
   pageUuid: string
 ): Promise<Message[]> => {
   const blocks = await logseq.Editor.getPageBlocksTree(pageUuid);
@@ -59,8 +59,37 @@ export const loadThreadMessageBlock = async (
   // Convert blocks to Message objects, preserving order
   const messages: Message[] = messageBlocks.map((block) => ({
     role: block.properties!.role as "user" | "assistant",
-    content: block.content,
+    content: filterPropertyLines(block.content),
   }));
 
   return messages;
+};
+
+export const createChatThreadPage = async (
+  firstMessage: string
+): Promise<string> => {
+  // Use first 64 characters of the message as the page title
+  const pageTitle = firstMessage.substring(0, 64);
+
+  // Create page with type property
+  const page = await logseq.Editor.createPage(
+    pageTitle,
+    { type: "logseq ai chat thread" },
+    { createFirstBlock: false }
+  );
+
+  if (!page) {
+    throw new Error("Failed to create chat thread page");
+  }
+
+  return page.uuid;
+};
+
+export const appendMessageToThread = async (
+  pageUuid: string,
+  message: Message
+): Promise<void> => {
+  await logseq.Editor.appendBlockInPage(pageUuid, message.content, {
+    properties: { role: message.role },
+  });
 };

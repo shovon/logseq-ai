@@ -7,8 +7,14 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 // import { onReady } from "./ready-service";
-import { getAllChatThreads, loadThreadMessageBlock } from "./querier";
+import {
+  getAllChatThreads,
+  loadThreadMessageBlocks,
+  createChatThreadPage,
+  appendMessageToThread,
+} from "./querier";
 import type { Message } from "./querier";
+import { filterPropertyLines } from "./utils";
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 
@@ -22,34 +28,6 @@ const SYSTEM_PROMPT = `You are a helpful AI assistant integrated with Logseq. He
 
 Just note, when a user uses the \`[[SOME PAGE NAME]]\` syntax, they are referring to a page, and you can find it in the page references list.`;
 
-// Filter out lines matching "key:: value\n" pattern that are contiguously
-// placed in the header
-const filterPropertyLines = (content: string): string => {
-  const lines = content.split("\n");
-  const propertyPattern = /^[^:]+::\s*.+$/;
-  let headerEnded = false;
-
-  return lines
-    .filter((line) => {
-      // If we've already passed the header section, keep all lines
-      if (headerEnded) {
-        return true;
-      }
-
-      // Check if this line is a property line
-      const isPropertyLine = propertyPattern.test(line);
-
-      // If it's a property line, remove it (we're still in the header)
-      // If it's not a property line, keep it and mark that the header has ended
-      if (!isPropertyLine) {
-        headerEnded = true;
-      }
-
-      return !isPropertyLine;
-    })
-    .join("\n");
-};
-
 type AppView = { type: "CHAT_HISTORY" } | { type: "CHAT_THREAD" };
 
 function App() {
@@ -57,6 +35,9 @@ function App() {
   const [userInput, setUserInput] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [viewState, setViewState] = useState<AppView>({ type: "CHAT_THREAD" });
+  const [currentThreadPageUuid, setCurrentThreadPageUuid] = useState<
+    string | null
+  >(null);
 
   // Determine button state
   const isButtonDisabled = !userInput.trim() || isLoading;
@@ -118,6 +99,24 @@ function App() {
         { role: "user" as const, content: currentInput },
       ];
       setMessages(updatedMessages);
+
+      // Handle thread storage
+      let threadUuid = currentThreadPageUuid;
+      try {
+        // Create new thread if needed
+        if (threadUuid === null) {
+          threadUuid = await createChatThreadPage(currentInput);
+          setCurrentThreadPageUuid(threadUuid);
+        }
+
+        // Store user message
+        await appendMessageToThread(threadUuid, {
+          role: "user",
+          content: currentInput,
+        });
+      } catch (error) {
+        console.error("Error storing user message:", error);
+      }
 
       try {
         let contextString: string | null = null;
@@ -213,6 +212,18 @@ function App() {
           ...prev,
           { role: "assistant", content: assistantResponse },
         ]);
+
+        // Store assistant message
+        try {
+          if (threadUuid) {
+            await appendMessageToThread(threadUuid, {
+              role: "assistant",
+              content: assistantResponse,
+            });
+          }
+        } catch (error) {
+          console.error("Error storing assistant message:", error);
+        }
       } catch (error) {
         console.error("Error generating text:", error);
         const errorMessage = "Error: Unable to generate response";
@@ -220,6 +231,18 @@ function App() {
           ...prev,
           { role: "assistant", content: errorMessage },
         ]);
+
+        // Store error message too
+        try {
+          if (threadUuid) {
+            await appendMessageToThread(threadUuid, {
+              role: "assistant",
+              content: errorMessage,
+            });
+          }
+        } catch (storageError) {
+          console.error("Error storing error message:", storageError);
+        }
       } finally {
         setIsLoading(false);
         setStreamingContent("");
@@ -240,6 +263,7 @@ function App() {
     setViewState({ type: "CHAT_THREAD" });
     setMessages([]);
     setUserInput("");
+    setCurrentThreadPageUuid(null);
   };
 
   const navigateToHistory = () => {
@@ -249,8 +273,9 @@ function App() {
   const navigateToThread = async (threadUuid?: string) => {
     if (threadUuid) {
       try {
-        const loadedMessages = await loadThreadMessageBlock(threadUuid);
+        const loadedMessages = await loadThreadMessageBlocks(threadUuid);
         setMessages(loadedMessages);
+        setCurrentThreadPageUuid(threadUuid);
       } catch (error) {
         console.error("Error loading thread messages:", error);
         logseq.UI.showMsg("Error loading thread messages", "error");
