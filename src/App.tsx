@@ -1,50 +1,34 @@
-import { createOpenAI } from "@ai-sdk/openai";
-import { streamText } from "ai";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useCurrentPageState } from "./useCurrentPageState";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
-// import { onReady } from "./ready-service";
-import {
-  getAllChatThreads,
-  loadThreadMessageBlocks,
-  createChatThreadPage,
-  appendMessageToThread,
-} from "./querier";
-import type { Message } from "./querier";
+import { getAllChatThreads } from "./querier";
 import { filterPropertyLines } from "./utils";
-
-const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
-
-console.log(OPENAI_API_KEY);
-
-const openai = createOpenAI({
-  apiKey: OPENAI_API_KEY,
-});
-
-const SYSTEM_PROMPT = `You are a helpful AI assistant integrated with Logseq. Help users with their questions and tasks.
-
-Just note, when a user uses the \`[[SOME PAGE NAME]]\` syntax, they are referring to a page, and you can find it in the page references list.`;
+import { useCurrentPageState } from "./useCurrentPageState";
+import { useChatThread } from "./hooks/useChatThread";
+import { useChatCompletion } from "./hooks/useChatCompletion";
 
 type AppView = { type: "CHAT_HISTORY" } | { type: "CHAT_THREAD" };
 
 function App() {
-  const [messages, setMessages] = useState<Message[]>([]);
   const [userInput, setUserInput] = useState<string>("");
-  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [viewState, setViewState] = useState<AppView>({ type: "CHAT_THREAD" });
-  const [currentThreadPageUuid, setCurrentThreadPageUuid] = useState<
-    string | null
-  >(null);
+  const currentPageState = useCurrentPageState();
+
+  // Hooks for business logic
+  const chatThread = useChatThread();
+  const { sendMessage, isLoading, streamingContent } = useChatCompletion(
+    chatThread,
+    currentPageState
+  );
 
   // Determine button state
   const isButtonDisabled = !userInput.trim() || isLoading;
-  const [streamingContent, setStreamingContent] = useState<string>("");
+
+  // Scroll behavior
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isUserAtBottom, setIsUserAtBottom] = useState<boolean>(true);
-  const currentPageState = useCurrentPageState();
 
   // Check if user is scrolled to bottom
   const checkIfAtBottom = () => {
@@ -75,179 +59,13 @@ function App() {
   // Auto-scroll when new messages are added
   useEffect(() => {
     scrollToBottom();
-  }, [messages.length, scrollToBottom]);
+  }, [chatThread.messages.length, scrollToBottom]);
 
   const handleSendMessage = () => {
-    (async () => {
-      if (!userInput.trim() || isLoading) return;
+    const currentInput = userInput;
+    setUserInput(""); // Clear input
 
-      setIsLoading(true);
-      const currentInput = userInput;
-
-      // Extract strings from [[...]] format
-      const extractedBrackets = (
-        currentInput.match(/\[\[([^\]]+)\]\]/g) || []
-      ).map((match) => match.slice(2, -2)); // Remove [[ and ]]
-      console.log("Extracted brackets:", extractedBrackets);
-
-      setUserInput(""); // Clear input
-      setStreamingContent(""); // Clear streaming content
-
-      // Add user message to conversation
-      const updatedMessages: Message[] = [
-        ...messages,
-        { role: "user" as const, content: currentInput },
-      ];
-      setMessages(updatedMessages);
-
-      // Handle thread storage
-      let threadUuid = currentThreadPageUuid;
-      try {
-        // Create new thread if needed
-        if (threadUuid === null) {
-          threadUuid = await createChatThreadPage(currentInput);
-          setCurrentThreadPageUuid(threadUuid);
-        }
-
-        // Store user message
-        await appendMessageToThread(threadUuid, {
-          role: "user",
-          content: currentInput,
-        });
-      } catch (error) {
-        console.error("Error storing user message:", error);
-      }
-
-      try {
-        let contextString: string | null = null;
-
-        if (currentPageState.type === "LOADED") {
-          const blocks = await logseq.Editor.getPageBlocksTree(
-            currentPageState.name
-          ); // e.g., page content, block content, etc.
-          contextString = blocks.map((b) => b.content).join("\n\n");
-
-          const links =
-            (await logseq.Editor.getPageLinkedReferences(
-              currentPageState.name
-            )) ?? [];
-
-          if (links.length > 0) {
-            contextString += "\n\n## Backlinks";
-            for (const link of links) {
-              for (const block of link[1]) {
-                if (
-                  block.content &&
-                  block.content.includes(`[[${currentPageState.name}]]`)
-                ) {
-                  contextString += "\n\n" + block.content;
-                }
-              }
-            }
-          }
-        }
-
-        // Extract page content from here.
-        const extractedPagesContent = [];
-        for (const pageName of extractedBrackets) {
-          console.log(pageName);
-          try {
-            const blocks = await logseq.Editor.getPageBlocksTree(pageName);
-            const pageContent = blocks.map((b) => b.content).join("\n\n");
-
-            console.log(pageContent);
-
-            const backlinks =
-              (await logseq.Editor.getPageLinkedReferences(pageName)) ?? [];
-
-            extractedPagesContent.push({
-              pageName,
-              content: pageContent,
-              backlinks: backlinks
-                .map((link) => link[1].map((block) => block.content))
-                .flat(),
-            });
-          } catch (error) {
-            console.log(`Error fetching page ${pageName}:`, error);
-          }
-        }
-        console.log("Extracted pages content:", extractedPagesContent);
-
-        // Build a dynamic system prompt with context
-        let systemPromptWithContext =
-          currentPageState.type === "LOADED"
-            ? `${SYSTEM_PROMPT}\n\nCurrent Page:\n# ${currentPageState.name}\n\n${contextString}`
-            : SYSTEM_PROMPT;
-
-        // Add referenced pages to the context
-        if (extractedPagesContent.length > 0) {
-          let referencedPagesSection = "\n\n## Referenced Pages\n";
-          for (const page of extractedPagesContent) {
-            referencedPagesSection += `\nPage Name: ${
-              page.pageName
-            }\n\n## Backlinks\n${page.content}\n${page.backlinks.join("\n\n")}`;
-          }
-          systemPromptWithContext += referencedPagesSection;
-        }
-
-        console.log(systemPromptWithContext);
-
-        const result = await streamText({
-          model: openai("gpt-4"),
-          messages: [
-            { role: "system" as const, content: systemPromptWithContext },
-            ...updatedMessages,
-          ],
-        });
-
-        let assistantResponse = "";
-        // Stream the text as it comes in
-        for await (const delta of result.textStream) {
-          assistantResponse += delta;
-          setStreamingContent(assistantResponse);
-        }
-
-        // Add assistant's response to conversation
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: assistantResponse },
-        ]);
-
-        // Store assistant message
-        try {
-          if (threadUuid) {
-            await appendMessageToThread(threadUuid, {
-              role: "assistant",
-              content: assistantResponse,
-            });
-          }
-        } catch (error) {
-          console.error("Error storing assistant message:", error);
-        }
-      } catch (error) {
-        console.error("Error generating text:", error);
-        const errorMessage = "Error: Unable to generate response";
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: errorMessage },
-        ]);
-
-        // Store error message too
-        try {
-          if (threadUuid) {
-            await appendMessageToThread(threadUuid, {
-              role: "assistant",
-              content: errorMessage,
-            });
-          }
-        } catch (storageError) {
-          console.error("Error storing error message:", storageError);
-        }
-      } finally {
-        setIsLoading(false);
-        setStreamingContent("");
-      }
-    })().catch((e) => {
+    sendMessage(currentInput).catch((e) => {
       logseq.UI.showMsg(`${e ?? ""}`, "error");
     });
   };
@@ -261,9 +79,8 @@ function App() {
 
   const navigateToNewChat = () => {
     setViewState({ type: "CHAT_THREAD" });
-    setMessages([]);
+    chatThread.clearThread();
     setUserInput("");
-    setCurrentThreadPageUuid(null);
   };
 
   const navigateToHistory = () => {
@@ -273,9 +90,7 @@ function App() {
   const navigateToThread = async (threadUuid?: string) => {
     if (threadUuid) {
       try {
-        const loadedMessages = await loadThreadMessageBlocks(threadUuid);
-        setMessages(loadedMessages);
-        setCurrentThreadPageUuid(threadUuid);
+        await chatThread.loadThread(threadUuid);
       } catch (error) {
         console.error("Error loading thread messages:", error);
         logseq.UI.showMsg("Error loading thread messages", "error");
@@ -379,12 +194,12 @@ function App() {
               onScroll={handleScroll}
               className="flex-1 overflow-auto p-6 space-y-4"
             >
-              {messages.length === 0 && !isLoading && (
+              {chatThread.messages.length === 0 && !isLoading && (
                 <div className="text-gray-500 text-center">
                   Ask me anything!
                 </div>
               )}
-              {messages.map((message, index) => (
+              {chatThread.messages.map((message, index) => (
                 <div
                   key={index}
                   className={`rounded-lg ${
