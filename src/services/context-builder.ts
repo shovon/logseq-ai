@@ -13,13 +13,17 @@ export interface ReferencedPage {
  * Extract page references from text in the format [[Page Name]]
  */
 export function extractPageReferences(text: string): string[] {
-  return (text.match(/\[\[([^\]]+)\]\]/g) || []).map((match) => match.slice(2, -2)); // Remove [[ and ]]
+  return (text.match(/\[\[([^\]]+)\]\]/g) || []).map((match) =>
+    match.slice(2, -2)
+  ); // Remove [[ and ]]
 }
 
 /**
  * Build context for a single page, including content and backlinks
  */
-export async function buildPageContext(pageName: string): Promise<string | null> {
+export async function buildPageContext(
+  pageName: string
+): Promise<string | null> {
   const blocks = await logseq.Editor.getPageBlocksTree(pageName);
   let contextString = blocks.map((b) => b.content).join("\n\n");
 
@@ -52,12 +56,15 @@ export async function buildReferencedPagesContext(
       const blocks = await logseq.Editor.getPageBlocksTree(pageName);
       const pageContent = blocks.map((b) => b.content).join("\n\n");
 
-      const backlinks = (await logseq.Editor.getPageLinkedReferences(pageName)) ?? [];
+      const backlinks =
+        (await logseq.Editor.getPageLinkedReferences(pageName)) ?? [];
 
       extractedPagesContent.push({
         pageName,
         content: pageContent,
-        backlinks: backlinks.map((link) => link[1].map((block) => block.content)).flat(),
+        backlinks: backlinks
+          .map((link) => link[1].map((block) => block.content))
+          .flat(),
       });
     } catch (error) {
       console.log(`Error fetching page ${pageName}:`, error);
@@ -86,7 +93,32 @@ export function buildSystemPrompt(
   if (referencedPages.length > 0) {
     let referencedPagesSection = "\n\n## Referenced Pages\n";
     for (const page of referencedPages) {
-      referencedPagesSection += `\nPage Name: ${page.pageName}\n\n## Backlinks\n${page.content}\n${page.backlinks.join("\n\n")}`;
+      referencedPagesSection += `\nPage Name: ${
+        page.pageName
+      }\n\n## Backlinks\n${page.content}\n${page.backlinks.join("\n\n")}`;
+    }
+    systemPromptWithContext += referencedPagesSection;
+  }
+
+  return systemPromptWithContext;
+}
+
+/**
+ * Build a complete system prompt with current page and referenced pages context
+ */
+export function buildSystemPromptWithoutCurrentPage(
+  basePrompt: string,
+  referencedPages: ReferencedPage[]
+): string {
+  let systemPromptWithContext = basePrompt;
+
+  // Add referenced pages context
+  if (referencedPages.length > 0) {
+    let referencedPagesSection = "\n\n## Referenced Pages\n";
+    for (const page of referencedPages) {
+      referencedPagesSection += `\nPage Name: ${
+        page.pageName
+      }\n\n## Backlinks\n${page.content}\n${page.backlinks.join("\n\n")}`;
     }
     systemPromptWithContext += referencedPagesSection;
   }
