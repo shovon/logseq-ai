@@ -57,24 +57,11 @@ export function subjectWithReplayLast<T>() {
 export function filterPropertyLines(content: string): string {
   const lines = content.split("\n");
   const propertyPattern = /^[^:]+::\s*.+$/;
-  let headerEnded = false;
 
   return lines
     .filter((line) => {
-      // If we've already passed the header section, keep all lines
-      if (headerEnded) {
-        return true;
-      }
-
       // Check if this line is a property line
       const isPropertyLine = propertyPattern.test(line);
-
-      // If it's a property line, remove it (we're still in the header)
-      // If it's not a property line, keep it and mark that the header has ended
-      if (!isPropertyLine) {
-        headerEnded = true;
-      }
-
       return !isPropertyLine;
     })
     .join("\n");
