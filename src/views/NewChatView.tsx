@@ -31,9 +31,11 @@ export function NewChatView({ onThreadCreated }: NewChatViewProps) {
       } as Message);
 
       // Spawn completion job for assistant reply (no prior messages for new chat)
-      await spawnCompletionJobForPage(pageId, {
+      spawnCompletionJobForPage(pageId, {
         input: currentInput,
         messages: [],
+      }).catch(() => {
+        logseq.UI.showMsg("Failed to start assistant reply.", "error");
       });
 
       // Transition to CHAT_THREAD view
