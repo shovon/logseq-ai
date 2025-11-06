@@ -4,7 +4,7 @@ import type { BlockMessage } from "../querier";
 
 /**
  * A hook to get all messages that are stored in the graph.
- * @param pageId The page ID to read the curren state from.
+ * @param pageId The page ID to read the current state from.
  * @returns A list of messages
  */
 export function useReadChatThread(pageId: string) {
@@ -37,14 +37,11 @@ export function useReadChatThread(pageId: string) {
       } catch (error) {
         console.error("Error loading thread messages:", error);
       }
-
-      return () => {
-        cancelled = true;
-      };
     });
 
     return () => {
       unsubscribe();
+      cancelled = true;
     };
   }, [pageId]);
 

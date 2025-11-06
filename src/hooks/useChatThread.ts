@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Message } from "../querier";
+import type { BlockMessage, Message } from "../querier";
 import {
   loadThreadMessageBlocks,
   createChatThreadPage,
@@ -7,7 +7,7 @@ import {
 } from "../querier";
 
 export function useChatThread() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<BlockMessage[]>([]);
   const [currentThreadPageUuid, setCurrentThreadPageUuid] = useState<
     string | null
   >(null);
@@ -36,8 +36,8 @@ export function useChatThread() {
     await appendMessageToThread(currentThreadPageUuid, message);
   };
 
-  const addMessage = (message: Message) => {
-    setMessages((prev) => [...prev, message]);
+  const addMessage = () => {
+    // setMessages((prev) => [...prev, message]);
   };
 
   const clearThread = () => {

@@ -6,6 +6,7 @@ import {
   buildReferencedPagesContext,
   buildSystemPromptWithoutCurrentPage,
 } from "./context-builder";
+import { onTaskEnd, startTask } from "./jobs";
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 
@@ -51,4 +52,38 @@ export async function streamChatCompletion(
   });
 
   return result.textStream;
+}
+
+const newCompletionJobId = (pageId: string) => `completion-job-${pageId}`;
+
+export function spawnCompletionJobForPage(
+  pageId: string,
+  { input, messages }: { input: string; messages: Message[] }
+) {
+  return startTask(newCompletionJobId(pageId), async () => {
+    const stream = streamChatCompletion(input, messages);
+    const properties = () => ({ role: "assistant" });
+
+    // First, append a new block to the page and get its uuid
+    const newBlock = await logseq.Editor.appendBlockInPage(pageId, "", {
+      properties: properties(),
+    }); // empty string for initial content
+    if (!newBlock?.uuid)
+      throw new Error("Failed to create block for streaming response.");
+
+    // We'll accumulate streaming text here so we can update the block content
+    let content = "";
+
+    // Await the stream and update block as we go
+    for await (const delta of await stream) {
+      content += delta;
+      await logseq.Editor.updateBlock(newBlock.uuid, content, {
+        properties: properties(),
+      });
+    }
+  });
+}
+
+export function onCompletionJobDone(pageId: string, listener: () => void) {
+  onTaskEnd(newCompletionJobId(pageId), listener);
 }
