@@ -6,7 +6,7 @@ import {
   buildReferencedPagesContext,
   buildSystemPromptWithoutCurrentPage,
 } from "./context-builder";
-import { onTaskEnd, startTask } from "./jobs";
+import { isTaskActive, onTaskEnd, startTask } from "./jobs";
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 
@@ -86,4 +86,8 @@ export function spawnCompletionJobForPage(
 
 export function onCompletionJobDone(pageId: string, listener: () => void) {
   onTaskEnd(newCompletionJobId(pageId), listener);
+}
+
+export function isCompletionJobActive(pageId: string): boolean {
+  return isTaskActive(newCompletionJobId(pageId));
 }
