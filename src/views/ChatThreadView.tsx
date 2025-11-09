@@ -5,9 +5,10 @@ import type { Message, BlockMessage } from "../querier";
 import { appendMessageToThread, loadThreadMessageBlocks } from "../querier";
 import {
   spawnCompletionJobForPage,
-  onCompletionJobDone,
-  isCompletionJobActive,
+  getCompletionJobStatus,
+  subscribeToCompletionJobs,
 } from "../services/chat-completion";
+import type { JobStatus } from "../services/job-registry";
 
 interface ChatThreadViewProps {
   pageId: string;
@@ -16,8 +17,8 @@ interface ChatThreadViewProps {
 export function ChatThreadView({ pageId }: ChatThreadViewProps) {
   const [userInput, setUserInput] = useState<string>("");
   const [messages, setMessages] = useState<BlockMessage[]>([]);
-  const [jobActive, setJobActive] = useState<boolean>(() =>
-    isCompletionJobActive(pageId)
+  const [jobStatus, setJobStatus] = useState<JobStatus>(() =>
+    getCompletionJobStatus(pageId)
   );
 
   useEffect(
@@ -47,11 +48,16 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
   }, [pageId]);
 
   useEffect(() => {
-    // Set up listener for job completion
-    onCompletionJobDone(pageId, () => {
-      console.log("Got notification of completion being done");
-      setJobActive(false);
+    setJobStatus(getCompletionJobStatus(pageId));
+    const unsubscribe = subscribeToCompletionJobs((id, status) => {
+      if (id === pageId) {
+        setJobStatus(status);
+      }
     });
+
+    return () => {
+      unsubscribe();
+    };
   }, [pageId]);
 
   const handleSendMessage = async () => {
@@ -72,7 +78,6 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
       })) as Message[];
 
       // Spawn completion job for assistant reply
-      setJobActive(true);
       await spawnCompletionJobForPage(pageId, {
         input: currentInput,
         messages: priorMessages,
@@ -82,7 +87,8 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
     }
   };
 
-  console.log("Is job active", jobActive);
+  const jobActive = jobStatus.state === "running";
+  console.log("Completion job status", jobStatus);
 
   return (
     <>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { getAllChatThreads } from "../querier";
 
 interface ChatHistoryViewProps {
@@ -11,19 +11,31 @@ export function ChatHistoryView({ onThreadSelect }: ChatHistoryViewProps) {
   >([]);
   const [isLoadingThreads, setIsLoadingThreads] = useState(true);
 
-  useEffect(() => {
-    const loadChatThreads = async () => {
-      try {
-        const threads = await getAllChatThreads();
-        setChatThreads(threads);
-      } catch (error) {
-        console.error("Error loading chat threads:", error);
-      } finally {
-        setIsLoadingThreads(false);
-      }
-    };
-    loadChatThreads();
+  const loadChatThreads = useCallback(async () => {
+    try {
+      const threads = await getAllChatThreads();
+      setChatThreads(threads);
+    } catch (error) {
+      console.error("Error loading chat threads:", error);
+    } finally {
+      setIsLoadingThreads(false);
+    }
   }, []);
+
+  useEffect(() => {
+    setIsLoadingThreads(true);
+    loadChatThreads();
+  }, [loadChatThreads]);
+
+  useEffect(() => {
+    const unsubscribe = logseq.DB.onChanged(() => {
+      loadChatThreads();
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [loadChatThreads]);
 
   if (isLoadingThreads) {
     return (

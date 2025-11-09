@@ -1,7 +1,7 @@
 import type { Message } from "../querier";
 
 // jobRegistry.ts
-type JobStatus =
+export type JobStatus =
   | { state: "idle" }
   | { state: "running"; abort: AbortController }
   | { state: "done" }
@@ -19,7 +19,11 @@ const notify = (pageId: string) => {
 
 export function subscribe(listener: Listener): () => void {
   listeners.add(listener);
-  // push current statuses immediately if you like
+  queueMicrotask(() => {
+    statuses.forEach((status, pageId) => {
+      listener(pageId, status);
+    });
+  });
   return () => listeners.delete(listener);
 }
 

@@ -1,11 +1,14 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChatInput } from "../components/ChatInput";
 import {
   appendMessageToThread,
   createChatThreadPage,
   type Message,
 } from "../querier";
-import { spawnCompletionJobForPage } from "../services/chat-completion";
+import {
+  spawnCompletionJobForPage,
+  subscribeToCompletionJobs,
+} from "../services/chat-completion";
 
 interface NewChatViewProps {
   onThreadCreated: (pageId: string) => void;
@@ -13,8 +16,30 @@ interface NewChatViewProps {
 
 export function NewChatView({ onThreadCreated }: NewChatViewProps) {
   const [userInput, setUserInput] = useState<string>("");
+  const [hasRunningJob, setHasRunningJob] = useState(false);
+  const runningPagesRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const runningPages = runningPagesRef.current;
+    const unsubscribe = subscribeToCompletionJobs((pageId, status) => {
+      if (status.state === "running") {
+        runningPages.add(pageId);
+      } else {
+        runningPages.delete(pageId);
+      }
+      setHasRunningJob(runningPages.size > 0);
+    });
+
+    return () => {
+      runningPages.clear();
+      setHasRunningJob(false);
+      unsubscribe();
+    };
+  }, []);
 
   const handleSendMessage = async () => {
+    if (hasRunningJob) return;
+
     const currentInput = userInput;
     setUserInput("");
 
@@ -30,16 +55,23 @@ export function NewChatView({ onThreadCreated }: NewChatViewProps) {
         content: currentInput,
       } as Message);
 
+      runningPagesRef.current.add(pageId);
+      setHasRunningJob(true);
+
       // Spawn completion job for assistant reply (no prior messages for new chat)
-      spawnCompletionJobForPage(pageId, {
+      const startPromise = spawnCompletionJobForPage(pageId, {
         input: currentInput,
         messages: [],
-      }).catch(() => {
+      }).catch((error) => {
+        console.error("Failed to start assistant reply.", error);
         logseq.UI.showMsg("Failed to start assistant reply.", "error");
+        runningPagesRef.current.delete(pageId);
+        setHasRunningJob(runningPagesRef.current.size > 0);
       });
 
       // Transition to CHAT_THREAD view
       onThreadCreated(pageId);
+      await startPromise;
     } catch (e) {
       logseq.UI.showMsg(`${e ?? ""}`, "error");
     }
@@ -54,7 +86,7 @@ export function NewChatView({ onThreadCreated }: NewChatViewProps) {
         value={userInput}
         onChange={setUserInput}
         onSend={handleSendMessage}
-        disabled={false}
+        disabled={hasRunningJob}
       />
     </>
   );
