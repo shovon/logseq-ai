@@ -5,11 +5,17 @@
  */
 export function subject<T>() {
   const listeners = new Set<(v: T) => void>();
+  let last: [T] | null = null;
   return {
-    listen: (listener: <T>(v: T) => void) => {
+    listen: (listener: (v: T) => void, immediate = false) => {
+      if (last !== null && immediate) listener(last[0]);
       listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
     },
     next: (v: T) => {
+      last = [v];
       for (const listener of listeners) {
         listener(v);
       }
@@ -26,27 +32,11 @@ export function gate() {
       else listeners.add(listener);
     },
     open: () => {
+      if (done) return;
       done = true;
       for (const listener of listeners) {
         listener();
         listeners.delete(listener);
-      }
-    },
-  };
-}
-
-export function subjectWithReplayLast<T>() {
-  const listeners = new Set<(v: T) => void>();
-  let last: [T] | null = null;
-  return {
-    listen: (listener: <T>(v: T) => void) => {
-      if (last !== null) listener(last);
-      listeners.add(listener);
-    },
-    next: (v: T) => {
-      last = [v];
-      for (const listener of listeners) {
-        listener(v);
       }
     },
   };

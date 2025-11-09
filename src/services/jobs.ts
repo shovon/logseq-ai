@@ -41,6 +41,7 @@ export async function startTask(
 ) {
   let isDone = false;
   const endTask = () => {
+    console.log("End task has been called");
     if (isDone) return;
     isDone = true;
     const task = tasks.get(id);

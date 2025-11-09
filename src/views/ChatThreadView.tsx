@@ -49,6 +49,7 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
   useEffect(() => {
     // Set up listener for job completion
     onCompletionJobDone(pageId, () => {
+      console.log("Got notification of completion being done");
       setJobActive(false);
     });
   }, [pageId]);
@@ -80,6 +81,8 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
       logseq.UI.showMsg(`${e ?? ""}`, "error");
     }
   };
+
+  console.log("Is job active", jobActive);
 
   return (
     <>

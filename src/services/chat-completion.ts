@@ -81,6 +81,8 @@ export function spawnCompletionJobForPage(
         properties: properties(),
       });
     }
+
+    console.log("Completion done");
   });
 }
 
