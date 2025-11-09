@@ -1,27 +1,10 @@
 import { gate, subject } from "../../utils";
 import type { Actor } from "./actor";
 
-type CompletionResult<TResult> =
-  | {
-      type: "SUCCESS";
-      result: TResult;
-    }
-  | {
-      type: "ERROR";
-      error: unknown;
-    }
-  | {
-      type: "REJECTED";
-    }
-  | {
-      type: "CANCELED";
-    };
-
-type JobRunnerEvent<TInput, TResult> =
+type JobRunnerEvent<TInput> =
   | {
       type: "RUN_JOB";
       input: TInput;
-      onResponse: (result: CompletionResult<TResult>) => void;
     }
   | {
       type: "CANCEL_RUNNING_JOB";
@@ -49,17 +32,19 @@ type JobRunnerState<TResult> =
       error: unknown;
     };
 
-export type JobActor<TResult, TInput> = Actor<
-  JobRunnerEvent<TInput, TResult>,
+export type JobActor<TInput, TResult> = Actor<
+  JobRunnerEvent<TInput>,
   JobRunnerState<TResult>
 >;
 
+export type JobRunner<TInput, TResult> = (
+  input: TInput,
+  onStop: ReturnType<typeof gate>["listen"]
+) => Promise<TResult>;
+
 export const createJobActor = <TInput, TResult>(
-  fn: (
-    input: TInput,
-    onStop: ReturnType<typeof gate>["listen"]
-  ) => Promise<TResult>
-): JobActor<TResult, TInput> => {
+  fn: JobRunner<TInput, TResult>
+): JobActor<TInput, TResult> => {
   type LocalState = JobRunnerState<TResult>;
 
   const jobSubject = subject<LocalState>();
@@ -75,18 +60,12 @@ export const createJobActor = <TInput, TResult>(
     jobSubject.next(state);
   }
 
-  function runJob(
-    input: TInput,
-    onResponse: (result: CompletionResult<TResult>) => void
-  ) {
+  function runJob(input: TInput) {
     const stopGate = gate();
     runningJobStopper = stopGate.open;
     const promise = (async () => {
       return fn(input, stopGate.listen);
     })();
-    stopGate.listen(() => {
-      onResponse({ type: "CANCELED" });
-    });
     const runningState = { type: "RUNNING" } satisfies LocalState;
     setState(runningState);
     const clearRunningJobStopper = () => {
@@ -97,14 +76,12 @@ export const createJobActor = <TInput, TResult>(
         clearRunningJobStopper();
         if (currentState.type === "RUNNING") {
           setState({ type: "DONE", result });
-          onResponse({ type: "SUCCESS", result });
         }
       },
       (error) => {
         clearRunningJobStopper();
         if (currentState.type === "RUNNING") {
           setState({ type: "FAILED", error });
-          onResponse({ type: "ERROR", error });
         }
       }
     );
@@ -118,13 +95,8 @@ export const createJobActor = <TInput, TResult>(
       }
       switch (event.type) {
         case "RUN_JOB":
-          {
-            const { onResponse } = event;
-            if (currentState.type === "RUNNING") {
-              onResponse({ type: "REJECTED" });
-            } else {
-              runJob(event.input, onResponse);
-            }
+          if (currentState.type !== "RUNNING") {
+            runJob(event.input);
           }
           break;
         case "CANCEL_RUNNING_JOB":
