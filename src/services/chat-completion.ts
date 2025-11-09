@@ -93,3 +93,27 @@ export function onCompletionJobDone(pageId: string, listener: () => void) {
 export function isCompletionJobActive(pageId: string): boolean {
   return isTaskActive(newCompletionJobId(pageId));
 }
+
+export async function* runCompletion({
+  input,
+  messages,
+  signal,
+}: {
+  input: string;
+  messages: Message[];
+  signal: AbortSignal;
+}): AsyncIterable<string> {
+  const stream = await streamText({
+    model: openai("gpt-4o"),
+    messages: [
+      { role: "system", content: "..." },
+      ...messages,
+      { role: "user", content: input },
+    ],
+  });
+
+  for await (const delta of stream.textStream) {
+    if (signal.aborted) return;
+    yield delta;
+  }
+}
