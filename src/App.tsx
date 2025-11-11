@@ -2,6 +2,7 @@ import { useState } from "react";
 import { NewChatView } from "./views/NewChatView";
 import { ChatThreadView } from "./views/ChatThreadView";
 import { ChatHistoryView } from "./views/ChatHistoryView";
+import { SIDEBAR_HANDLE_WIDTH } from "./services/sidebar-resizer";
 
 type AppView =
   | { type: "CHAT_HISTORY" }
@@ -24,8 +25,15 @@ function App() {
   };
 
   return (
-    <aside className="logseq-ai-plugin text-gray-800 h-screen">
-      <section className="bg-white bg-opacity-90 shadow-lg h-full border-l border-gray-200 flex flex-col overflow-hidden w-full">
+    <aside className="logseq-ai-plugin text-gray-800 h-screen flex">
+      {/* <div
+        style={{ width: SIDEBAR_HANDLE_WIDTH }}
+        className={`h-full cursor-ew-resize select-none bg-gray-300 hover:bg-gray-400 transition-colors shrink-0`}
+        role="separator"
+        aria-orientation="vertical"
+      >
+      </div> */}
+      <section className="bg-white bg-opacity-90 shadow-lg h-full border-l border-gray-200 flex flex-col overflow-hidden flex-1">
         {/* Navigation Header */}
         <div className="flex p-4 border-b border-gray-200 bg-gray-50">
           <button
