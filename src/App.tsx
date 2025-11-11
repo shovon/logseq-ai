@@ -2,7 +2,6 @@ import { useState } from "react";
 import { NewChatView } from "./views/NewChatView";
 import { ChatThreadView } from "./views/ChatThreadView";
 import { ChatHistoryView } from "./views/ChatHistoryView";
-import { SIDEBAR_HANDLE_WIDTH } from "./services/sidebar-resizer";
 
 type AppView =
   | { type: "CHAT_HISTORY" }
