@@ -34,7 +34,8 @@ const sidebarWidthStorageKey = `${applicationId}-logseq-ai-plugin.sidebar-width`
 
 const defaultWidth = 400;
 
-const sidebarHandleWidth = 2;
+const sidebarHandleWidth = 4;
+const spacerLeftPadding = 10;
 
 // Local state -----------------------------------------------------------------
 
@@ -132,10 +133,13 @@ const removeOverlay = () => {
 
 // Spacer ----------------------------------------------------------------------
 
+const computeSpacerWidth = (targetSidebarWidth: number) =>
+  targetSidebarWidth + sidebarHandleWidth + spacerLeftPadding;
+
 // Note: this is supposed to update the width the spacer.
 //
 // Question: does it? Let's read through this to find out.
-const updateSpacerWidth = (sidebarWidth: number) => {
+const updateSpacerWidth = (newSidebarWidth: number) => {
   // This is
   const doc = getParentViewportDocument();
   if (!doc) {
@@ -147,7 +151,7 @@ const updateSpacerWidth = (sidebarWidth: number) => {
   ) as HTMLDivElement | null;
 
   if (element) {
-    element.style.width = `${sidebarWidth + sidebarHandleWidth}px`;
+    element.style.width = `${computeSpacerWidth(newSidebarWidth)}px`;
   }
 };
 
@@ -158,9 +162,9 @@ const injectSpacer = () => {
   logseq.provideUI({
     key: spacerId,
     path: "#root",
-    template: `<div style="width: ${
-      getSidebarWidth() + sidebarHandleWidth
-    }px; background: black; height: 100vh; cursor: ew-resize"></div>`,
+    template: `<div style="width: ${computeSpacerWidth(
+      getSidebarWidth()
+    )}px; background: transparent; height: 100vh; cursor: ew-resize"></div>`,
   });
 };
 
