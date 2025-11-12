@@ -34,11 +34,9 @@ export const useCurrentPageState = (): CurrentPageState => {
 
   useEffect(() => {
     let isClosed = false;
-    console.log("Listening for route changes");
     if (isClosed) return;
 
     onRouteChanged(() => {
-      console.log("Route changed");
       if (isClosed) return;
 
       logseq.Editor.getCurrentPage()

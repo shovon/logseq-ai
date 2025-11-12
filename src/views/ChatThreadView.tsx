@@ -88,7 +88,6 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
   };
 
   const jobActive = jobStatus.state === "running";
-  console.log("Completion job status", jobStatus);
 
   return (
     <>

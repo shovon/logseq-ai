@@ -14,12 +14,6 @@ import {
   subscribe as subscribeToJobs,
 } from "./job-registry";
 
-const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
-
-const openai = createOpenAI({
-  apiKey: OPENAI_API_KEY,
-});
-
 const SYSTEM_PROMPT = `You are a helpful AI assistant integrated with Logseq. Help users with their questions and tasks.
 
 Just note, when a user uses the \`[[SOME PAGE NAME]]\` syntax, they are referring to a page, and you can find it in the page references list.`;
@@ -40,6 +34,18 @@ export async function* runCompletion({
   messages: Message[];
   signal: AbortSignal;
 }): AsyncIterable<string> {
+  const apiKeyValue = logseq.settings?.openAiApiKey;
+
+  if (typeof apiKeyValue !== "string" || apiKeyValue.trim() === "") {
+    throw new Error(
+      "OpenAI API key is not configured. Please set it in the plugin settings."
+    );
+  }
+
+  const openai = createOpenAI({
+    apiKey: apiKeyValue,
+  });
+
   const stream = await streamText({
     model: openai("gpt-4"),
     messages: await buildPromptWithContext(input, messages),
@@ -58,9 +64,8 @@ async function buildPromptWithContext(
   const extractedBrackets = extractPageReferences(input);
   console.log("Extracted brackets:", extractedBrackets);
 
-  const extractedPagesContent = await buildReferencedPagesContext(
-    extractedBrackets
-  );
+  const extractedPagesContent =
+    await buildReferencedPagesContext(extractedBrackets);
   console.log("Extracted pages content:", extractedPagesContent);
 
   const systemPromptWithContext = buildSystemPromptWithoutCurrentPage(

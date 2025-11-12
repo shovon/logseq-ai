@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { NewChatView } from "./views/NewChatView";
 import { ChatThreadView } from "./views/ChatThreadView";
 import { ChatHistoryView } from "./views/ChatHistoryView";
+import { ApiKeySetupView } from "./views/ApiKeySetupView";
 
 type AppView =
   | { type: "CHAT_HISTORY" }
@@ -10,6 +11,49 @@ type AppView =
 
 function App() {
   const [viewState, setViewState] = useState<AppView>({ type: "NEW_CHAT" });
+  const [apiKeyLoading, setApiKeyLoading] = useState(true);
+  const [hasApiKey, setHasApiKey] = useState(false);
+
+  // Check API key on mount and when settings change
+  useEffect(() => {
+    const apiKey = logseq.settings?.openAiApiKey;
+    if (typeof apiKey === "string" && apiKey.trim() !== "") {
+      setHasApiKey(true);
+    } else {
+      setHasApiKey(false);
+    }
+    setApiKeyLoading(false);
+  }, []);
+
+  useEffect(() => {
+    return logseq.onSettingsChanged(() => {
+      const apiKey = logseq.settings?.openAiApiKey;
+      if (typeof apiKey === "string" && apiKey.trim() !== "") {
+        setHasApiKey(true);
+      } else {
+        setHasApiKey(false);
+      }
+    });
+  }, []);
+
+  const handleApiKeySaved = () => {
+    // Re-check API key after it's saved
+    const apiKey = logseq.settings?.openAiApiKey;
+    if (typeof apiKey === "string" && apiKey.trim() !== "") {
+      setHasApiKey(true);
+    }
+  };
+
+  // Early return if loading or no API key
+  if (apiKeyLoading || !hasApiKey) {
+    return (
+      <aside className="logseq-ai-plugin text-gray-800 h-screen flex">
+        <section className="bg-white bg-opacity-90 shadow-lg h-full border-l border-gray-200 flex flex-col overflow-hidden flex-1">
+          <ApiKeySetupView onApiKeySaved={handleApiKeySaved} />
+        </section>
+      </aside>
+    );
+  }
 
   const navigateToNewChat = () => {
     setViewState({ type: "NEW_CHAT" });
