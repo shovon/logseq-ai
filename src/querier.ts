@@ -10,13 +10,25 @@ import type { BlockEntity } from "@logseq/libs/dist/LSPlugin.user";
 // This page helped me prompt engineer my way into finding the right query:
 // https://docs.logseq.com/#/page/advanced%20queries
 
-const PageType = z.object({
-  name: z.string().optional(),
-  uuid: z.string(),
-  id: z.number().optional(),
-});
+const PageType = z
+  .object({
+    name: z.string().optional(),
+    uuid: z.string(),
+    id: z.number().optional(),
+    ["original-name"]: z.string().optional(),
+    content: z.string().optional(),
+  })
+  .transform(
+    ({ name, uuid, id, ["original-name"]: originalName, content }) => ({
+      name,
+      uuid,
+      id,
+      originalName,
+      content,
+    })
+  );
 
-type PageType = z.infer<typeof PageType>;
+export type PageType = z.infer<typeof PageType>;
 
 type Role = "user" | "assistant" | "system";
 const Role: z.ZodSchema<Role> = z.union([
@@ -44,6 +56,8 @@ export const getAllChatThreads = async (): Promise<PageType[]> => {
       [(= ?type "logseq ai chat thread")]
       [?p :block/name _]]
     `);
+
+  console.log(result);
 
   const pages = z.union([z.array(z.array(PageType)), z.null()]).parse(result);
 

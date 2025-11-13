@@ -1,14 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { getAllChatThreads } from "../querier";
+import { getAllChatThreads, type PageType } from "../querier";
 
 interface ChatHistoryViewProps {
   onThreadSelect: (threadUuid: string) => void;
 }
 
 export function ChatHistoryView({ onThreadSelect }: ChatHistoryViewProps) {
-  const [chatThreads, setChatThreads] = useState<
-    { uuid: string; name?: string; content?: string }[]
-  >([]);
+  const [chatThreads, setChatThreads] = useState<PageType[]>([]);
   const [isLoadingThreads, setIsLoadingThreads] = useState(true);
 
   const loadChatThreads = useCallback(async () => {
@@ -58,7 +56,7 @@ export function ChatHistoryView({ onThreadSelect }: ChatHistoryViewProps) {
               className="p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
             >
               <div className="font-medium text-gray-800">
-                {thread.name || `Chat Thread ${index + 1}`}
+                {thread.originalName || `Chat Thread ${index + 1}`}
               </div>
               <div className="text-sm text-gray-500">
                 {thread.content
