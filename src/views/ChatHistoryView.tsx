@@ -37,15 +37,15 @@ export function ChatHistoryView({ onThreadSelect }: ChatHistoryViewProps) {
 
   if (isLoadingThreads) {
     return (
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4">
         <div className="text-gray-500 text-center">Loading chat history...</div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 overflow-auto p-6">
-      <div className="space-y-2">
+    <div className="flex-1 overflow-auto p-4">
+      <div className="space-y-1">
         {chatThreads.length === 0 ? (
           <div className="text-gray-500 text-center">No chat threads found</div>
         ) : (
@@ -53,15 +53,10 @@ export function ChatHistoryView({ onThreadSelect }: ChatHistoryViewProps) {
             <div
               key={thread.uuid || index}
               onClick={() => onThreadSelect(thread.uuid)}
-              className="p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+              className="py-2 px-3 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
             >
-              <div className="font-medium text-gray-800">
+              <div className="text-gray-800 truncate">
                 {thread.originalName || `Chat Thread ${index + 1}`}
-              </div>
-              <div className="text-sm text-gray-500">
-                {thread.content
-                  ? `${thread.content.substring(0, 100)}...`
-                  : "No content"}
               </div>
             </div>
           ))
