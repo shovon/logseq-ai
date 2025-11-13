@@ -26,8 +26,6 @@ export function ApiKeySetupView({ onApiKeySaved }: ApiKeySetupViewProps) {
         openAiApiKey: trimmedKey,
       });
 
-      console.log(logseq.settings);
-
       // Re-check settings to ensure it was saved
       const savedKey = logseq.settings?.openAiApiKey;
       if (typeof savedKey === "string" && savedKey.trim() === trimmedKey) {
