@@ -308,7 +308,7 @@ const initializeToolbar = () => {
   logseq.provideStyle(`
     .${iconName} {
       font-size: 20px;
-      margin-top: 4px;
+      margin-top: 2px;
     }
 
     .${iconName}:hover {
@@ -347,7 +347,7 @@ const initializeToolbar = () => {
     key: iconName,
     template: `
       <a class="button relative" data-on-click="toggle">
-        <div class="${iconName}">✨</div>
+        <span class="${iconName}"><i class="ti ti-message-chatbot"></i></span>
       </a>  
     `,
   });
