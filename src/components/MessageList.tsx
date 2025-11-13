@@ -5,6 +5,8 @@ import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { filterPropertyLines } from "../utils";
 import type { BlockMessage } from "../querier";
+import type { Components } from "react-markdown";
+import { remarkLogseqPageRefs } from "../plugins/remark-logseq-page-refs";
 
 interface MessageListProps {
   messages: BlockMessage[];
@@ -46,6 +48,46 @@ export function MessageList({ messages, jobActive = false }: MessageListProps) {
     scrollToBottom();
   }, [jobActive, scrollToBottom]);
 
+  // Custom component for handling Logseq page references
+  const markdownComponents: Components = {
+    a: ({ node: _, href, children, ...remainder }) => {
+      console.log(children);
+      // Check if this is a Logseq page reference link
+      if (
+        href === "#" &&
+        typeof children === "string" &&
+        /^\[\[([^\]]+)\]\]$/.test(children)
+      ) {
+        // const pageName = decodeURIComponent(href.replace("logseq://page/", ""));
+        return (
+          <a
+            {...remainder}
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              logseq.App.pushState("page", {
+                name: children.slice(2, -2),
+              });
+            }}
+            className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium"
+          >
+            {children}
+          </a>
+        );
+      }
+      // Default link behavior for regular links
+      return (
+        <a
+          href={href}
+          {...remainder}
+          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium"
+        >
+          {children}
+        </a>
+      );
+    },
+  };
+
   return (
     <div
       ref={scrollContainerRef}
@@ -64,8 +106,9 @@ export function MessageList({ messages, jobActive = false }: MessageListProps) {
         >
           <div className="prose prose-sm max-w-none [&_p]:my-4 [&_li]:my-2 [&_h1]:mt-6 [&_h1]:mb-4 [&_h2]:mt-5 [&_h2]:mb-3 [&_h3]:mt-4 [&_h3]:mb-3 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
             <ReactMarkdown
-              remarkPlugins={[remarkMath]}
+              remarkPlugins={[remarkMath, remarkLogseqPageRefs]}
               rehypePlugins={[rehypeKatex]}
+              components={markdownComponents}
             >
               {filterPropertyLines(message.message.content)}
             </ReactMarkdown>
@@ -76,8 +119,9 @@ export function MessageList({ messages, jobActive = false }: MessageListProps) {
         <div className="rounded-lg">
           <div className="prose prose-sm max-w-none [&_p]:my-4 [&_li]:my-2 [&_h1]:mt-6 [&_h1]:mb-4 [&_h2]:mt-5 [&_h2]:mb-3 [&_h3]:mt-4 [&_h3]:mb-3 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
             <ReactMarkdown
-              remarkPlugins={[remarkMath]}
+              remarkPlugins={[remarkMath, remarkLogseqPageRefs]}
               rehypePlugins={[rehypeKatex]}
+              components={markdownComponents}
             >
               {filterPropertyLines("Thinking...")}
             </ReactMarkdown>
@@ -87,4 +131,3 @@ export function MessageList({ messages, jobActive = false }: MessageListProps) {
     </div>
   );
 }
-
