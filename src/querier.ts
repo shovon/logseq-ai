@@ -16,15 +16,24 @@ const PageType = z
     uuid: z.string(),
     id: z.number().optional(),
     ["original-name"]: z.string().optional(),
+    ["updated-at"]: z.number().transform((ts) => new Date(ts)),
     content: z.string().optional(),
   })
   .transform(
-    ({ name, uuid, id, ["original-name"]: originalName, content }) => ({
+    ({
+      name,
+      uuid,
+      id,
+      ["original-name"]: originalName,
+      ["updated-at"]: updatedAt,
+      content,
+    }) => ({
       name,
       uuid,
       id,
       originalName,
       content,
+      updatedAt,
     })
   );
 
@@ -57,11 +66,14 @@ export const getAllChatThreads = async (): Promise<PageType[]> => {
       [?p :block/name _]]
     `);
 
-  console.log(result);
-
   const pages = z.union([z.array(z.array(PageType)), z.null()]).parse(result);
 
-  return (pages ?? []).flat();
+  return (pages ?? []).flat().sort((a, b) => {
+    // Sort descending by updatedAt (most recent first)
+    const aTime = a.updatedAt.getTime() || 0;
+    const bTime = b.updatedAt.getTime() || 0;
+    return bTime - aTime;
+  });
 };
 
 export const loadThreadMessageBlocks = async (
