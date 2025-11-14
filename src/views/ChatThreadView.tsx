@@ -1,7 +1,11 @@
 import { useState, useEffect } from "react";
 import { ChatInput } from "../components/ChatInput";
 import { MessageList } from "../components/MessageList";
-import type { Message, BlockMessage } from "../querier";
+import {
+  type Message,
+  type BlockMessage,
+  deleteAllMessagesAfterBlock,
+} from "../querier";
 import { appendMessageToThread, loadThreadMessageBlocks } from "../querier";
 import {
   spawnCompletionJobForPage,
@@ -87,11 +91,40 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
     }
   };
 
+  const handleEditMessage = async (blockId: string, newContent: string) => {
+    try {
+      await logseq.Editor.updateBlock(blockId, newContent, {
+        properties: { role: "user" },
+      });
+
+      await deleteAllMessagesAfterBlock({ pageId, blockId });
+
+      // Build prior messages for completion
+      const priorMessages: Message[] = messages.map((m) => ({
+        role: m.message.role,
+        content: m.message.content,
+      })) as Message[];
+
+      // Spawn completion job for assistant reply
+      await spawnCompletionJobForPage(pageId, {
+        input: newContent,
+        messages: priorMessages,
+      });
+    } catch (e) {
+      console.error("Error updating message:", e);
+      logseq.UI.showMsg(`Error updating message: ${e ?? ""}`, "error");
+    }
+  };
+
   const jobActive = jobStatus.state === "running";
 
   return (
     <>
-      <MessageList messages={messages} jobActive={jobActive} />
+      <MessageList
+        messages={messages}
+        jobActive={jobActive}
+        onEdit={handleEditMessage}
+      />
       <ChatInput
         value={userInput}
         onChange={setUserInput}

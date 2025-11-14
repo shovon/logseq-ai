@@ -7,10 +7,12 @@ import { filterPropertyLines } from "../utils";
 import type { BlockMessage } from "../querier";
 import type { Components } from "react-markdown";
 import { remarkLogseqPageRefs } from "../plugins/remark-logseq-page-refs";
+import { IconPencil } from "@tabler/icons-react";
 
 interface MessageListProps {
   messages: BlockMessage[];
   jobActive?: boolean;
+  onEdit?: (blockId: string, newContent: string) => void;
 }
 
 // Shared markdown component configuration for handling Logseq page references
@@ -61,10 +63,76 @@ interface MessageContentProps {
   content: string;
 }
 
+interface UserMessageProps extends MessageContentProps {
+  blockId: string;
+  onEdit: (blockId: string, newContent: string) => void;
+}
+
 // User message component for user prompts
-function UserMessage({ content }: MessageContentProps) {
+function UserMessage({ content, blockId, onEdit }: UserMessageProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContent, setEditedContent] = useState(content);
+  const [isHovered, setIsHovered] = useState(false);
+
+  // Sync editedContent when content prop changes (e.g., after external update)
+  useEffect(() => {
+    if (!isEditing) {
+      setEditedContent(content);
+    }
+  }, [content, isEditing]);
+
+  const handleSave = () => {
+    onEdit(blockId, editedContent);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditedContent(content);
+    setIsEditing(false);
+  };
+
+  if (isEditing) {
+    return (
+      <div className="rounded-lg px-3 py-2 bg-blue-50 ml-8">
+        <textarea
+          value={editedContent}
+          onChange={(e) => setEditedContent(e.target.value)}
+          className="w-full min-h-[100px] p-2 border border-blue-200 rounded resize-y focus:outline-none focus:ring-2 focus:ring-blue-500"
+          autoFocus
+        />
+        <div className="flex gap-2 mt-2">
+          <button
+            onClick={handleSave}
+            className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+          >
+            Save
+          </button>
+          <button
+            onClick={handleCancel}
+            className="px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 text-sm"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="rounded-lg px-3 py-2 bg-blue-50 ml-8">
+    <div
+      className="rounded-lg px-3 py-2 bg-blue-50 ml-8 relative group"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {isHovered && (
+        <button
+          onClick={() => setIsEditing(true)}
+          className="absolute top-2 right-2 p-1 text-gray-600 hover:text-gray-800 hover:bg-blue-100 rounded transition-colors"
+          title="Edit message"
+        >
+          <IconPencil size={16} />
+        </button>
+      )}
       <div className={proseClasses}>
         <ReactMarkdown
           remarkPlugins={[remarkMath, remarkLogseqPageRefs]}
@@ -95,7 +163,11 @@ function AssistantMessage({ content }: MessageContentProps) {
   );
 }
 
-export function MessageList({ messages, jobActive = false }: MessageListProps) {
+export function MessageList({
+  messages,
+  jobActive = false,
+  onEdit,
+}: MessageListProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isUserAtBottom, setIsUserAtBottom] = useState<boolean>(true);
 
@@ -141,7 +213,12 @@ export function MessageList({ messages, jobActive = false }: MessageListProps) {
       )}
       {messages.map((message, index) =>
         message.message.role === "user" ? (
-          <UserMessage key={index} content={message.message.content} />
+          <UserMessage
+            key={index}
+            content={message.message.content}
+            blockId={message.block.uuid || ""}
+            onEdit={onEdit || (() => {})}
+          />
         ) : (
           <AssistantMessage key={index} content={message.message.content} />
         )

@@ -113,10 +113,16 @@ export const deleteAllMessagesAfterBlock = async ({
     throw new Error(`Block with id ${blockId} not found`);
   }
 
+  // Sanitize pageId to UUID (pageId can be anything, but canonical ID is UUID)
+  const page = await logseq.Editor.getPage(pageId);
+  if (!page) {
+    throw new Error(`Page with id ${pageId} not found`);
+  }
+
   // Guardrail: Validate that the block belongs to the specified pageId
   const blockPageId =
     targetBlock.page?.uuid || String(targetBlock.page?.id || "");
-  if (blockPageId !== pageId) {
+  if (page.id !== targetBlock.page.id) {
     throw new Error(
       `Block ${blockId} does not belong to page ${pageId}. ` +
         `Block belongs to page ${blockPageId || "unknown"}`

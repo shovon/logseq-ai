@@ -14,6 +14,7 @@
   "dependencies": {
     "@ai-sdk/openai": "^2.0.53",
     "@logseq/libs": "^0.0.17",
+    "@tabler/icons-react": "^3.35.0",
     "@tailwindcss/vite": "^4.1.16",
     "ai": "^5.0.79",
     "immer": "^10.2.0",
