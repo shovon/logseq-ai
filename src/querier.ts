@@ -100,6 +100,51 @@ export const loadThreadMessageBlocks = async (
   return messages;
 };
 
+export const deleteAllMessagesAfterBlock = async ({
+  pageId,
+  blockId,
+}: {
+  pageId: string;
+  blockId: string;
+}) => {
+  // Get the target block to validate it exists and belongs to the specified page
+  const targetBlock = await logseq.Editor.getBlock(blockId);
+  if (!targetBlock) {
+    throw new Error(`Block with id ${blockId} not found`);
+  }
+
+  // Guardrail: Validate that the block belongs to the specified pageId
+  const blockPageId =
+    targetBlock.page?.uuid || String(targetBlock.page?.id || "");
+  if (blockPageId !== pageId) {
+    throw new Error(
+      `Block ${blockId} does not belong to page ${pageId}. ` +
+        `Block belongs to page ${blockPageId || "unknown"}`
+    );
+  }
+
+  // Get all blocks from the page
+  const allBlocks = await logseq.Editor.getPageBlocksTree(pageId);
+
+  // Find the index of the target block
+  const targetIndex = allBlocks.findIndex((block) => block.uuid === blockId);
+  if (targetIndex === -1) {
+    throw new Error(`Block ${blockId} not found in page ${pageId}`);
+  }
+
+  // Get all blocks that come after the target block
+  const blocksToDelete = allBlocks.slice(targetIndex + 1);
+
+  // Delete blocks in reverse order to avoid index shifting issues
+  // (though with UUID-based deletion this shouldn't matter, but it's safer)
+  for (let i = blocksToDelete.length - 1; i >= 0; i--) {
+    const block = blocksToDelete[i];
+    if (block.uuid) {
+      await logseq.Editor.removeBlock(block.uuid);
+    }
+  }
+};
+
 export const createChatThreadPage = async (
   firstMessage: string
 ): Promise<string> => {
