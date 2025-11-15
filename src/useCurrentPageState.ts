@@ -36,7 +36,7 @@ export const useCurrentPageState = (): CurrentPageState => {
     let isClosed = false;
     if (isClosed) return;
 
-    onRouteChanged(() => {
+    const unsubscribe = onRouteChanged(() => {
       if (isClosed) return;
 
       logseq.Editor.getCurrentPage()
@@ -56,6 +56,7 @@ export const useCurrentPageState = (): CurrentPageState => {
 
     return () => {
       isClosed = true;
+      unsubscribe();
     };
   }, []);
 

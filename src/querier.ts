@@ -79,7 +79,12 @@ export const getAllChatThreads = async (): Promise<PageType[]> => {
 export const loadThreadMessageBlocks = async (
   pageUuid: string
 ): Promise<BlockMessage[]> => {
-  const blocks = await logseq.Editor.getPageBlocksTree(pageUuid);
+  // TODO: once logseq/logseq#12212 gets merged and deployed, we need to get rid
+  //   of the type assertion.
+  const blocks =
+    ((await logseq.Editor.getPageBlocksTree(
+      pageUuid
+    )) as Array<BlockEntity> | null) ?? [];
 
   // Filter top-level blocks with role property set to "user" or "assistant"
   const messageBlocks = blocks.filter(
