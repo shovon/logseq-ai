@@ -3,6 +3,7 @@ import { NewChatView } from "./views/NewChatView";
 import { ChatThreadView } from "./views/ChatThreadView";
 import { ChatHistoryView } from "./views/ChatHistoryView";
 import { ApiKeySetupView } from "./views/ApiKeySetupView";
+import { onRouteChanged } from "./route-change-service";
 
 type AppView =
   | { type: "CHAT_HISTORY" }
@@ -13,6 +14,38 @@ function App() {
   const [viewState, setViewState] = useState<AppView>({ type: "NEW_CHAT" });
   const [apiKeyLoading, setApiKeyLoading] = useState(true);
   const [hasApiKey, setHasApiKey] = useState(false);
+
+  useEffect(() => {
+    let isDone = false;
+    const currentViewState = viewState;
+
+    const lookForPageChanges = () => {
+      if (isDone) return;
+
+      if (currentViewState.type === "CHAT_THREAD") {
+        logseq.Editor.getPage(currentViewState.pageId)
+          .then((page) => {
+            console.log(page);
+            if (isDone) return;
+            if (!page) {
+              navigateToNewChat();
+            }
+          })
+          .catch((e) => {
+            console.error(e);
+          });
+      }
+    };
+
+    const unsubscribeOnChange = logseq.DB.onChanged(lookForPageChanges);
+    const unsubscribeOnOnRouteChanged = onRouteChanged(lookForPageChanges);
+
+    return () => {
+      isDone = true;
+      unsubscribeOnChange();
+      unsubscribeOnOnRouteChanged();
+    };
+  }, [viewState]);
 
   // Check API key on mount and when settings change
   useEffect(() => {
@@ -75,7 +108,8 @@ function App() {
           <button
             onClick={navigateToNewChat}
             className={`px-3 py-2 text-sm font-medium rounded-lg mr-2 ${
-              viewState.type === "CHAT_THREAD"
+              viewState.type === "CHAT_THREAD" ||
+              viewState.type === "CHAT_HISTORY"
                 ? "bg-blue-500 text-white"
                 : "bg-gray-200 text-gray-700 hover:bg-gray-300"
             }`}
