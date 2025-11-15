@@ -4,6 +4,7 @@ import { ChatThreadView } from "./views/ChatThreadView";
 import { ChatHistoryView } from "./views/ChatHistoryView";
 import { ApiKeySetupView } from "./views/ApiKeySetupView";
 import { onRouteChanged } from "./route-change-service";
+import { IconEdit, IconHistory } from "@tabler/icons-react";
 
 type AppView =
   | { type: "CHAT_HISTORY" }
@@ -104,24 +105,30 @@ function App() {
     <aside className="logseq-ai-plugin text-gray-800 h-screen flex">
       <section className="bg-white bg-opacity-90 shadow-lg h-full border-l border-gray-200 flex flex-col overflow-hidden flex-1">
         {/* Navigation Header */}
-        <div className="flex p-4 border-b border-gray-200 bg-gray-50">
-          <button
-            onClick={navigateToNewChat}
-            className={`px-3 py-2 text-sm font-medium rounded-lg mr-2 ${
-              viewState.type === "CHAT_THREAD" ||
-              viewState.type === "CHAT_HISTORY"
-                ? "bg-blue-500 text-white"
-                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-            }`}
-          >
-            New Chat
-          </button>
+        <div className="flex py-2 px-3 border-b border-gray-100">
           {viewState.type !== "CHAT_HISTORY" && (
             <button
               onClick={navigateToHistory}
-              className="px-3 py-2 text-sm font-medium rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300"
+              className="flex px-3 py-2 text-sm font-medium rounded-lg text-gray-700 hover:bg-gray-200"
             >
-              History
+              <div className="mt-0.5 mr-2">
+                <IconHistory size={16} />
+              </div>
+              <div>History</div>
+            </button>
+          )}
+
+          <div className="flex-1"></div>
+
+          {viewState.type !== "NEW_CHAT" && (
+            <button
+              onClick={navigateToNewChat}
+              className={`flex px-3 py-2 text-sm font-medium rounded-lg text-gray-700 hover:bg-gray-200`}
+            >
+              <div className="mt-0.5 mr-2">
+                <IconEdit size={16} />
+              </div>{" "}
+              <div>New Chat</div>
             </button>
           )}
         </div>
