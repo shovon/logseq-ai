@@ -82,3 +82,44 @@ export function transformDashBulletPointsToStars(markdown: string): string {
 
   return lines.join("\n");
 }
+
+export type TimePeriod =
+  | "today"
+  | "yesterday"
+  | "past week"
+  | "past month"
+  | "past year"
+  | "older";
+
+/**
+ * Categorizes a date into a time period based on when it occurred relative to now.
+ * @param date The date to categorize
+ * @returns The time period category
+ */
+export function categorizeDateByPeriod(date: Date): TimePeriod {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dateOnly = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate()
+  );
+
+  // Calculate difference in days
+  const diffInMs = today.getTime() - dateOnly.getTime();
+  const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+  if (diffInDays === 0) {
+    return "today";
+  } else if (diffInDays === 1) {
+    return "yesterday";
+  } else if (diffInDays <= 7) {
+    return "past week";
+  } else if (diffInDays <= 30) {
+    return "past month";
+  } else if (diffInDays <= 365) {
+    return "past year";
+  } else {
+    return "older";
+  }
+}
