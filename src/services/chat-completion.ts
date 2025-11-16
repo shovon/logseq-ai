@@ -8,6 +8,7 @@ import {
   getStatus as getJobStatus,
   subscribe as subscribeToJobs,
 } from "./job-registry";
+import { buildEnhancedMessage } from "./agent-orchestrator";
 
 const SYSTEM_PROMPT = `You are a helpful AI assistant integrated with Logseq. Help users with their questions and tasks.
 
@@ -56,10 +57,13 @@ async function buildPromptWithContext(
   input: string,
   messages: Message[]
 ): Promise<Message[]> {
+  // Use agentic orchestrator to enhance the message with page context if needed
+  const { enhancedMessage } = await buildEnhancedMessage(input);
+
   return [
     { role: "system", content: SYSTEM_PROMPT },
     ...messages,
-    { role: "user", content: input },
+    { role: "user" as const, content: enhancedMessage },
   ];
 }
 
