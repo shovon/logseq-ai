@@ -8,6 +8,7 @@ import {
 import {
   spawnCompletionJobForPage,
   subscribeToCompletionJobs,
+  cancelCompletionJob,
 } from "../services/chat-completion";
 
 interface NewChatViewProps {
@@ -87,6 +88,13 @@ export function NewChatView({ onThreadCreated }: NewChatViewProps) {
         onChange={setUserInput}
         onSend={handleSendMessage}
         disabled={hasRunningJob}
+        isRunning={hasRunningJob}
+        onCancel={() => {
+          const runningPages = Array.from(runningPagesRef.current);
+          for (const pageId of runningPages) {
+            cancelCompletionJob(pageId);
+          }
+        }}
       />
     </>
   );

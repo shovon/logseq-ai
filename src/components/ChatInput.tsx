@@ -6,22 +6,31 @@ interface ChatInputProps {
   onChange: (value: string) => void;
   onSend: () => void;
   disabled?: boolean;
+  isRunning?: boolean;
+  onCancel?: () => void;
 }
 
 export function ChatInput({
   value,
   onChange,
   onSend,
+  isRunning,
+  onCancel,
   disabled = false,
 }: ChatInputProps) {
-  const isButtonDisabled = !value.trim() || disabled;
+  const isCancelMode = !!isRunning && !!onCancel;
+  const isButtonDisabled = isCancelMode ? false : !value.trim() || disabled;
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      onSend();
+      if (isCancelMode) {
+        onCancel?.();
+      } else if (!disabled) {
+        onSend();
+      }
     }
   };
 
@@ -67,14 +76,22 @@ export function ChatInput({
       <div className="flex p-2">
         <div className="flex-1"></div>
         <button
-          onClick={onSend}
+          onClick={() => {
+            if (isCancelMode) {
+              onCancel?.();
+            } else if (!disabled) {
+              onSend();
+            }
+          }}
           disabled={isButtonDisabled}
           className="block px-3 py-1.5 text-gray-700 rounded-lg text-sm font-bold cursor-pointer"
           style={{
             opacity: isButtonDisabled ? 0 : 1,
           }}
         >
-          {disabled ? (
+          {isCancelMode ? (
+            "Stop"
+          ) : disabled ? (
             "..."
           ) : (
             <div className="flex">

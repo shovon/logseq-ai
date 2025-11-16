@@ -11,6 +11,7 @@ import {
   spawnCompletionJobForPage,
   getCompletionJobStatus,
   subscribeToCompletionJobs,
+  cancelCompletionJob,
 } from "../services/chat-completion";
 import type { JobStatus } from "../services/job-registry";
 
@@ -130,6 +131,8 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
         onChange={setUserInput}
         onSend={handleSendMessage}
         disabled={jobActive}
+        isRunning={jobActive}
+        onCancel={() => cancelCompletionJob(pageId)}
       />
     </>
   );
