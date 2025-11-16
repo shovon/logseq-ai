@@ -56,3 +56,29 @@ export function filterPropertyLines(content: string): string {
     })
     .join("\n");
 }
+
+/**
+ * Take markdown, and looks at any bullet points foramatted using the `-` symbol
+ * and converts them to `*`.
+ *
+ * Do not worry, dashes inside codeblocks are ignored.
+ * @param markdown Markdown-formatted string.
+ */
+export function transformDashBulletPointsToStars(markdown: string): string {
+  const lines = markdown.split("\n");
+
+  let isInsideCodeboock = false;
+  for (const line of lines) {
+    if (line.trim() === "```") {
+      isInsideCodeboock = !isInsideCodeboock;
+    } else {
+      if (!isInsideCodeboock && line.trimStart().startsWith("-")) {
+        const leadingSpaces = line.match(/^\s*/)?.[0] ?? "";
+        const rest = line.trimStart().slice(1);
+        lines[lines.indexOf(line)] = leadingSpaces + "*" + rest;
+      }
+    }
+  }
+
+  return lines.join("\n");
+}
