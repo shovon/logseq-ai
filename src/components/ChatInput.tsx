@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { IconArrowUp } from "@tabler/icons-react";
 
 interface ChatInputProps {
@@ -15,6 +16,8 @@ export function ChatInput({
 }: ChatInputProps) {
   const isButtonDisabled = !value.trim() || disabled;
 
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -23,8 +26,35 @@ export function ChatInput({
   };
 
   return (
-    <div className="mt-auto bg-white border-t border-gray-200">
+    <div
+      className="mt-auto bg-white border-t border-gray-200"
+      onMouseDownCapture={(e) => {
+        if (disabled) return;
+        const target = e.target as HTMLElement;
+        // Avoid hijacking clicks meant for the textarea itself or the send button
+        const isClickInsideTextarea =
+          textareaRef.current != null &&
+          (target === textareaRef.current ||
+            textareaRef.current.contains(target));
+        const isClickOnButton = target.closest("button") != null;
+        if (isClickInsideTextarea || isClickOnButton) return;
+
+        // Prevent default so focus isn't stolen by the clicked element
+        e.preventDefault();
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          try {
+            // Place caret at the end
+            const end = value.length;
+            textareaRef.current.setSelectionRange(end, end);
+          } catch {
+            // Ignore if not supported
+          }
+        }
+      }}
+    >
       <textarea
+        ref={textareaRef}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyPress={handleKeyPress}
@@ -39,7 +69,7 @@ export function ChatInput({
         <button
           onClick={onSend}
           disabled={isButtonDisabled}
-          className="block px-3 py-1.5 text-gray-700 rounded-lg text-sm font-bold  cursor-pointer"
+          className="block px-3 py-1.5 text-gray-700 rounded-lg text-sm font-bold cursor-pointer"
           style={{
             opacity: isButtonDisabled ? 0 : 1,
           }}
