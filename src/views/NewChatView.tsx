@@ -10,6 +10,7 @@ import {
   subscribeToCompletionJobs,
   cancelCompletionJob,
 } from "../services/chat-completion";
+import { transformDashBulletPointsToStars } from "../utils";
 
 interface NewChatViewProps {
   onThreadCreated: (pageId: string) => void;
@@ -41,7 +42,7 @@ export function NewChatView({ onThreadCreated }: NewChatViewProps) {
   const handleSendMessage = async () => {
     if (hasRunningJob) return;
 
-    const currentInput = userInput;
+    const currentInput = transformDashBulletPointsToStars(userInput);
     setUserInput("");
 
     try {
@@ -61,7 +62,7 @@ export function NewChatView({ onThreadCreated }: NewChatViewProps) {
 
       // Spawn completion job for assistant reply (no prior messages for new chat)
       const startPromise = spawnCompletionJobForPage(pageId, {
-        input: currentInput,
+        input: transformDashBulletPointsToStars(currentInput),
         messages: [],
       }).catch((error) => {
         console.error("Failed to start assistant reply.", error);

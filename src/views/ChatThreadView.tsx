@@ -14,6 +14,7 @@ import {
   cancelCompletionJob,
 } from "../services/chat-completion";
 import type { JobStatus } from "../services/job-registry";
+import { transformDashBulletPointsToStars } from "../utils";
 
 interface ChatThreadViewProps {
   pageId: string;
@@ -66,8 +67,10 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
   }, [pageId]);
 
   const handleSendMessage = async () => {
-    const currentInput = userInput;
+    const currentInput = transformDashBulletPointsToStars(userInput);
     setUserInput("");
+
+    console.log(currentInput);
 
     try {
       // Append user message block
@@ -94,9 +97,13 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
 
   const handleEditMessage = async (blockId: string, newContent: string) => {
     try {
-      await logseq.Editor.updateBlock(blockId, newContent, {
-        properties: { role: "user" },
-      });
+      await logseq.Editor.updateBlock(
+        blockId,
+        transformDashBulletPointsToStars(newContent),
+        {
+          properties: { role: "user" },
+        }
+      );
 
       await deleteAllMessagesAfterBlock({ pageId, blockId });
 
@@ -108,7 +115,7 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
 
       // Spawn completion job for assistant reply
       await spawnCompletionJobForPage(pageId, {
-        input: newContent,
+        input: transformDashBulletPointsToStars(newContent),
         messages: priorMessages,
       });
     } catch (e) {
