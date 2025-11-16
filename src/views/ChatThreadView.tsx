@@ -96,6 +96,8 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
   };
 
   const handleEditMessage = async (blockId: string, newContent: string) => {
+    newContent = transformDashBulletPointsToStars(newContent);
+
     try {
       await logseq.Editor.updateBlock(
         blockId,
