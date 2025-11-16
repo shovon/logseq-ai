@@ -1,4 +1,5 @@
 import type { Message } from "../querier";
+import { transformDashBulletPointsToStars } from "../utils";
 
 // jobRegistry.ts
 export type JobStatus =
@@ -61,9 +62,13 @@ export async function startCompletionJob(
     let content = "";
     for await (const chunk of stream) {
       content += chunk;
-      await logseq.Editor.updateBlock(block.uuid, content, {
-        properties: { role: "assistant" },
-      });
+      await logseq.Editor.updateBlock(
+        block.uuid,
+        transformDashBulletPointsToStars(content),
+        {
+          properties: { role: "assistant" },
+        }
+      );
     }
 
     statuses.set(pageId, { state: "done" });

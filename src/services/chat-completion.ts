@@ -61,20 +61,8 @@ async function buildPromptWithContext(
   input: string,
   messages: Message[]
 ): Promise<Message[]> {
-  const extractedBrackets = extractPageReferences(input);
-  console.log("Extracted brackets:", extractedBrackets);
-
-  const extractedPagesContent =
-    await buildReferencedPagesContext(extractedBrackets);
-  console.log("Extracted pages content:", extractedPagesContent);
-
-  const systemPromptWithContext = buildSystemPromptWithoutCurrentPage(
-    SYSTEM_PROMPT,
-    extractedPagesContent
-  );
-
   return [
-    { role: "system", content: systemPromptWithContext },
+    { role: "system", content: SYSTEM_PROMPT },
     ...messages,
     { role: "user", content: input },
   ];
