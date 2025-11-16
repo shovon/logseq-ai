@@ -206,7 +206,7 @@ export function MessageList({
     <div
       ref={scrollContainerRef}
       onScroll={handleScroll}
-      className="flex-1 overflow-auto p-6 space-y-4"
+      className="flex-1 overflow-auto p-6 pb-4 space-y-4"
     >
       {messages.length === 0 && !jobActive && (
         <div className="text-gray-500 text-center">Ask me anything!</div>
