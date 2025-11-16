@@ -1,11 +1,6 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
 import type { Message } from "../querier";
-import {
-  extractPageReferences,
-  buildReferencedPagesContext,
-  buildSystemPromptWithoutCurrentPage,
-} from "./context-builder";
 import type { JobStatus } from "./job-registry";
 import {
   startCompletionJob,
