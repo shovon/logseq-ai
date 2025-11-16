@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 import { IconArrowUp } from "@tabler/icons-react";
 
 interface ChatInputProps {
@@ -33,6 +33,16 @@ export function ChatInput({
       }
     }
   };
+
+  // Auto-resize textarea based on content
+  useEffect(() => {
+    if (textareaRef.current) {
+      // Reset height to auto to get the correct scrollHeight
+      textareaRef.current.style.height = "auto";
+      // Set height to scrollHeight to fit content
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [value]);
 
   return (
     <div
@@ -71,7 +81,13 @@ export function ChatInput({
         className="w-full rounded-xl flex-1 resize-none border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none block pt-4 px-6"
         rows={1}
         disabled={disabled}
-        style={{ outline: "none", boxShadow: "none" }}
+        style={{
+          outline: "none",
+          boxShadow: "none",
+          minHeight: "2.5rem",
+          maxHeight: "12rem",
+          overflowY: "auto",
+        }}
       />
       <div className="flex p-2">
         <div className="flex-1"></div>
