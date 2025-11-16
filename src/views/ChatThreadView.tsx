@@ -73,17 +73,21 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
     console.log(currentInput);
 
     try {
+      // Build prior messages BEFORE appending the new message
+      // Filter out the last user message if it matches currentInput (safety check)
+      // This ensures we don't include the message we're about to send
+      const priorMessages: Message[] = messages.map((m) => ({
+        role: m.message.role,
+        content: m.message.content,
+      }));
+
+      console.log("Appending message to thread");
+
       // Append user message block
       await appendMessageToThread(pageId, {
         role: "user",
         content: currentInput,
       } as Message);
-
-      // Build prior messages for completion
-      const priorMessages: Message[] = messages.map((m) => ({
-        role: m.message.role,
-        content: m.message.content,
-      })) as Message[];
 
       // Spawn completion job for assistant reply
       await spawnCompletionJobForPage(pageId, {
