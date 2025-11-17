@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { getAllChatThreads, type PageType } from "../querier";
 import { categorizeDateByPeriod, type TimePeriod } from "../utils";
+import { onRouteChanged } from "../route-change-service";
 
 interface ChatHistoryViewProps {
   onThreadSelect: (threadUuid: string) => void;
@@ -27,12 +28,20 @@ export function ChatHistoryView({ onThreadSelect }: ChatHistoryViewProps) {
   }, [loadChatThreads]);
 
   useEffect(() => {
-    const unsubscribe = logseq.DB.onChanged(() => {
+    let isDone = false;
+
+    const lookForPageChanges = () => {
+      if (isDone) return;
       loadChatThreads();
-    });
+    };
+
+    const unsubscribeOnChange = logseq.DB.onChanged(lookForPageChanges);
+    const unsubscribeOnOnRouteChanged = onRouteChanged(lookForPageChanges);
 
     return () => {
-      unsubscribe();
+      isDone = true;
+      unsubscribeOnChange();
+      unsubscribeOnOnRouteChanged();
     };
   }, [loadChatThreads]);
 
