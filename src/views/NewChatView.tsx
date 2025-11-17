@@ -85,6 +85,7 @@ export function NewChatView({ onThreadCreated }: NewChatViewProps) {
         <div className="text-gray-500 text-center">Ask me anything!</div>
       </div>
       <ChatInput
+        className="mt-auto bg-white border-t border-gray-200"
         value={userInput}
         onChange={setUserInput}
         onSend={handleSendMessage}

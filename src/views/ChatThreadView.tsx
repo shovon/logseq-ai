@@ -140,6 +140,7 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
         onEdit={handleEditMessage}
       />
       <ChatInput
+        className="mt-auto bg-white border-t border-gray-200"
         value={userInput}
         onChange={setUserInput}
         onSend={handleSendMessage}

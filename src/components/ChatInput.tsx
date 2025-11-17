@@ -8,6 +8,7 @@ interface ChatInputProps {
   disabled?: boolean;
   isRunning?: boolean;
   onCancel?: () => void;
+  className?: string;
 }
 
 export function ChatInput({
@@ -16,6 +17,7 @@ export function ChatInput({
   onSend,
   isRunning,
   onCancel,
+  className,
   disabled = false,
 }: ChatInputProps) {
   const isCancelMode = !!isRunning && !!onCancel;
@@ -46,7 +48,7 @@ export function ChatInput({
 
   return (
     <div
-      className="mt-auto bg-white border-t border-gray-200"
+      className={className}
       onMouseDownCapture={(e) => {
         if (disabled) return;
         const target = e.target as HTMLElement;
