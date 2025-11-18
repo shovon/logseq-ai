@@ -5,8 +5,11 @@ import {
   type Message,
   type BlockMessage,
   deleteAllMessagesAfterBlock,
-} from "../querier";
-import { appendMessageToThread, loadThreadMessageBlocks } from "../querier";
+} from "../services/querier";
+import {
+  appendMessageToThread,
+  loadThreadMessageBlocks,
+} from "../services/querier";
 import {
   spawnCompletionJobForPage,
   getCompletionJobStatus,

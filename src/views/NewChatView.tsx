@@ -4,7 +4,7 @@ import {
   appendMessageToThread,
   createChatThreadPage,
   type Message,
-} from "../querier";
+} from "../services/querier";
 import {
   spawnCompletionJobForPage,
   subscribeToCompletionJobs,
