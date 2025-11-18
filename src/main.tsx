@@ -3,7 +3,7 @@ import "@logseq/libs";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.tsx";
-import { onReady } from "./ready-service.ts";
+import { onReady } from "./services/ready-service.ts";
 import { initializeSidebarStuff } from "./sidebar-stuff.ts";
 
 const main = () => {
