@@ -17,7 +17,6 @@ interface NewChatViewProps {
 }
 
 export function NewChatView({ onThreadCreated }: NewChatViewProps) {
-  const [userInput, setUserInput] = useState<string>("");
   const [hasRunningJob, setHasRunningJob] = useState(false);
   const runningPagesRef = useRef<Set<string>>(new Set());
 
@@ -39,11 +38,10 @@ export function NewChatView({ onThreadCreated }: NewChatViewProps) {
     };
   }, []);
 
-  const handleSendMessage = async () => {
+  const handleSendMessage = async (value: string) => {
     if (hasRunningJob) return;
 
-    const currentInput = transformDashBulletPointsToStars(userInput);
-    setUserInput("");
+    const currentInput = transformDashBulletPointsToStars(value);
 
     try {
       // Create thread using first 64 chars of input as title
@@ -86,8 +84,6 @@ export function NewChatView({ onThreadCreated }: NewChatViewProps) {
       </div>
       <ChatInput
         className="mt-auto bg-white border-t border-gray-200"
-        value={userInput}
-        onChange={setUserInput}
         onSend={handleSendMessage}
         disabled={hasRunningJob}
         isRunning={hasRunningJob}

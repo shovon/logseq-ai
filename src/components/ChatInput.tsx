@@ -1,10 +1,8 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { IconArrowUp } from "@tabler/icons-react";
 
 interface ChatInputProps {
-  value: string;
-  onChange: (value: string) => void;
-  onSend: () => void;
+  onSend: (value: string) => void;
   disabled?: boolean;
   isRunning?: boolean;
   onCancel?: () => void;
@@ -12,16 +10,17 @@ interface ChatInputProps {
 }
 
 export function ChatInput({
-  value,
-  onChange,
   onSend,
   isRunning,
   onCancel,
   className,
   disabled = false,
 }: ChatInputProps) {
+  const [inputValue, setInputValue] = useState<string>("");
   const isCancelMode = !!isRunning && !!onCancel;
-  const isButtonDisabled = isCancelMode ? false : !value.trim() || disabled;
+  const isButtonDisabled = isCancelMode
+    ? false
+    : !inputValue.trim() || disabled;
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -31,7 +30,8 @@ export function ChatInput({
       if (isCancelMode) {
         onCancel?.();
       } else if (!disabled) {
-        onSend();
+        onSend(inputValue);
+        setInputValue("");
       }
     }
   };
@@ -44,7 +44,7 @@ export function ChatInput({
       // Set height to scrollHeight to fit content
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
-  }, [value]);
+  }, [inputValue]);
 
   return (
     <div
@@ -66,7 +66,7 @@ export function ChatInput({
           textareaRef.current.focus();
           try {
             // Place caret at the end
-            const end = value.length;
+            const end = inputValue.length;
             textareaRef.current.setSelectionRange(end, end);
           } catch {
             // Ignore if not supported
@@ -76,8 +76,8 @@ export function ChatInput({
     >
       <textarea
         ref={textareaRef}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
         onKeyDown={handleKeyPress}
         placeholder="Type your message here..."
         className="w-full rounded-xl flex-1 resize-none border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none block pt-4 px-6"
@@ -98,7 +98,8 @@ export function ChatInput({
             if (isCancelMode) {
               onCancel?.();
             } else if (!disabled) {
-              onSend();
+              onSend(inputValue);
+              setInputValue("");
             }
           }}
           disabled={isButtonDisabled}

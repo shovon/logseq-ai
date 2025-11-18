@@ -21,7 +21,6 @@ interface ChatThreadViewProps {
 }
 
 export function ChatThreadView({ pageId }: ChatThreadViewProps) {
-  const [userInput, setUserInput] = useState<string>("");
   const [messages, setMessages] = useState<BlockMessage[]>([]);
   const [jobStatus, setJobStatus] = useState<JobStatus>(() =>
     getCompletionJobStatus(pageId)
@@ -66,9 +65,8 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
     };
   }, [pageId]);
 
-  const handleSendMessage = async () => {
-    const currentInput = transformDashBulletPointsToStars(userInput);
-    setUserInput("");
+  const handleSendMessage = async (value: string) => {
+    const currentInput = transformDashBulletPointsToStars(value);
 
     console.log(currentInput);
 
@@ -141,8 +139,6 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
       />
       <ChatInput
         className="mt-auto bg-white border-t border-gray-200"
-        value={userInput}
-        onChange={setUserInput}
         onSend={handleSendMessage}
         disabled={jobActive}
         isRunning={jobActive}
