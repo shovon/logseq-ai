@@ -7,6 +7,7 @@ interface ChatInputProps {
   isRunning?: boolean;
   onCancel?: () => void;
   className?: string;
+  onPageRefChange?: (content: string) => void;
 }
 
 export function ChatInput({
@@ -15,6 +16,7 @@ export function ChatInput({
   onCancel,
   className,
   disabled = false,
+  onPageRefChange,
 }: ChatInputProps) {
   const [inputValue, setInputValue] = useState<string>("");
   const isCancelMode = !!isRunning && !!onCancel;
@@ -23,6 +25,92 @@ export function ChatInput({
     : !inputValue.trim() || disabled;
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Helper function to find content between [[ ]] brackets at cursor position
+  const getBracketContent = (
+    cursorPos: number,
+    text: string
+  ): string | null => {
+    if (text.length < 4 || cursorPos < 0 || cursorPos > text.length) {
+      return null;
+    }
+
+    // Find the innermost [[ ]] pair containing the cursor
+    // Search backwards from cursor to find opening [[
+    let openBracketStart = -1;
+    let bracketDepth = 0;
+
+    // Search backwards to find the opening [[
+    for (let i = cursorPos - 1; i >= 1; i--) {
+      if (text.substring(i - 1, i + 1) === "[[") {
+        // Found opening bracket
+        if (bracketDepth === 0) {
+          openBracketStart = i - 1;
+          break;
+        } else {
+          bracketDepth--;
+        }
+        i--; // Skip the second bracket
+      } else if (text.substring(i - 1, i + 1) === "]]") {
+        // Found closing bracket while searching backwards
+        bracketDepth++;
+        i--; // Skip the second bracket
+      }
+    }
+
+    // Check if cursor is at the very start and text starts with [[
+    if (
+      openBracketStart === -1 &&
+      cursorPos >= 0 &&
+      cursorPos <= 2 &&
+      text.substring(0, 2) === "[["
+    ) {
+      openBracketStart = 0;
+      bracketDepth = 0;
+    }
+
+    if (openBracketStart === -1) {
+      return null; // No opening bracket found
+    }
+
+    // Search forwards from cursor to find the matching closing ]]
+    bracketDepth = 0;
+    let closeBracketEnd = -1;
+
+    for (let i = cursorPos; i < text.length - 1; i++) {
+      if (text.substring(i, i + 2) === "[[") {
+        // Found nested opening bracket
+        bracketDepth++;
+        i++; // Skip the second bracket
+      } else if (text.substring(i, i + 2) === "]]") {
+        // Found closing bracket
+        if (bracketDepth === 0) {
+          closeBracketEnd = i + 1;
+          break;
+        } else {
+          bracketDepth--;
+        }
+        i++; // Skip the second bracket
+      }
+    }
+
+    if (closeBracketEnd === -1) {
+      return null; // No closing bracket found
+    }
+
+    // Extract content between brackets
+    const contentStart = openBracketStart + 2;
+    const contentEnd = closeBracketEnd - 1;
+
+    // Check if cursor is actually inside the brackets (not on the brackets themselves)
+    // Cursor should be between contentStart (inclusive) and contentEnd + 1 (inclusive)
+    // This means cursor can be right after [[ or right before ]]
+    if (cursorPos < contentStart || cursorPos > contentEnd + 1) {
+      return null;
+    }
+
+    return text.substring(contentStart, contentEnd + 1);
+  };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -136,7 +224,21 @@ export function ChatInput({
       <textarea
         ref={textareaRef}
         value={inputValue}
-        onChange={(e) => setInputValue(e.target.value)}
+        onChange={(e) => {
+          const newValue = e.target.value;
+          setInputValue(newValue);
+
+          // Check if cursor is inside [[ ]] brackets after the change
+          setTimeout(() => {
+            if (textareaRef.current) {
+              const cursorPos = textareaRef.current.selectionStart;
+              const content = getBracketContent(cursorPos, newValue);
+              if (content !== null) {
+                onPageRefChange?.(content);
+              }
+            }
+          }, 0);
+        }}
         onKeyDown={handleKeyPress}
         placeholder="Type your message here..."
         className="w-full rounded-xl flex-1 resize-none border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none block pt-4 px-6"
