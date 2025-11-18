@@ -4,6 +4,7 @@ import {
   appendMessageToThread,
   createChatThreadPage,
   type Message,
+  searchPagesByName,
 } from "../services/querier";
 import {
   spawnCompletionJobForPage,
@@ -93,10 +94,7 @@ export function NewChatView({ onThreadCreated }: NewChatViewProps) {
             cancelCompletionJob(pageId);
           }
         }}
-        onPageRefSearch={async (_content: string) => {
-          // TODO: Implement page reference search
-          return [];
-        }}
+        onPageRefSearch={searchPagesByName}
       />
     </>
   );

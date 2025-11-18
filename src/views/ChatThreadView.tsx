@@ -5,6 +5,7 @@ import {
   type Message,
   type BlockMessage,
   deleteAllMessagesAfterBlock,
+  searchPagesByName,
 } from "../services/querier";
 import {
   appendMessageToThread,
@@ -146,10 +147,7 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
         disabled={jobActive}
         isRunning={jobActive}
         onCancel={() => cancelCompletionJob(pageId)}
-        onPageRefSearch={async (_content: string) => {
-          // TODO: Implement page reference search
-          return [];
-        }}
+        onPageRefSearch={searchPagesByName}
       />
     </>
   );

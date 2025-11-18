@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from "react";
 import { IconArrowUp } from "@tabler/icons-react";
+import type { PageType } from "../services/querier";
 
 interface ChatInputProps {
   onSend: (value: string) => void;
@@ -7,7 +8,7 @@ interface ChatInputProps {
   isRunning?: boolean;
   onCancel?: () => void;
   className?: string;
-  onPageRefSearch: (content: string) => Promise<Array<unknown>>;
+  onPageRefSearch: (content: string) => Promise<PageType[]>;
 }
 
 export function ChatInput({
@@ -100,7 +101,7 @@ export function ChatInput({
 
     // Extract content between brackets
     const contentStart = openBracketStart + 2;
-    const contentEnd = closeBracketEnd - 1;
+    const contentEnd = closeBracketEnd - 2;
 
     // Check if cursor is actually inside the brackets (not on the brackets themselves)
     // Cursor should be between contentStart (inclusive) and contentEnd + 1 (inclusive)
