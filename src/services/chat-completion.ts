@@ -1,6 +1,6 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
-import type { Message } from "../querier";
+import type { Message } from "./querier";
 import type { JobStatus } from "./job-registry";
 import {
   startCompletionJob,
