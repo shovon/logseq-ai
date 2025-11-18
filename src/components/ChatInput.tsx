@@ -64,6 +64,34 @@ export function ChatInput({
           textarea.setSelectionRange(start + 1, start + 1);
         }
       }
+    } else if (e.key === "Backspace") {
+      // Delete closing bracket when deleting opening bracket from empty [] pair
+      if (textareaRef.current) {
+        const textarea = textareaRef.current;
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+
+        // Only handle if there's a single cursor (no selection)
+        if (start === end && start > 0) {
+          const charBefore = inputValue.substring(start - 1, start);
+          const charAfter = inputValue.substring(start, start + 1);
+
+          // If we're deleting '[' and ']' is immediately after, delete both
+          if (charBefore === "[" && charAfter === "]") {
+            e.preventDefault();
+            const newValue =
+              inputValue.substring(0, start - 1) +
+              inputValue.substring(start + 1);
+            setInputValue(newValue);
+            // Position cursor at the deletion point
+            setTimeout(() => {
+              if (textareaRef.current) {
+                textareaRef.current.setSelectionRange(start - 1, start - 1);
+              }
+            }, 0);
+          }
+        }
+      }
     }
   };
 
