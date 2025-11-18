@@ -4,7 +4,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { filterPropertyLines } from "../../utils";
-import type { BlockMessage } from "../../querier";
+import type { BlockMessage } from "../../services/querier";
 import type { Components } from "react-markdown";
 import { remarkLogseqPageRefs } from "./remark-logseq-page-refs";
 import { IconPencil } from "@tabler/icons-react";

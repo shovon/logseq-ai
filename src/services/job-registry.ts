@@ -1,4 +1,4 @@
-import type { Message } from "../querier";
+import type { Message } from "./querier";
 import { transformDashBulletPointsToStars } from "../utils";
 
 // jobRegistry.ts

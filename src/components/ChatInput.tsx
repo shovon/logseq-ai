@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from "react";
 import { IconArrowUp } from "@tabler/icons-react";
+import type { PageType } from "../services/querier";
 
 interface ChatInputProps {
   onSend: (value: string) => void;
@@ -7,6 +8,7 @@ interface ChatInputProps {
   isRunning?: boolean;
   onCancel?: () => void;
   className?: string;
+  searchPage: (query: string) => Promise<PageType[]>;
 }
 
 export function ChatInput({
@@ -15,16 +17,178 @@ export function ChatInput({
   onCancel,
   className,
   disabled = false,
+  searchPage,
 }: ChatInputProps) {
   const [inputValue, setInputValue] = useState<string>("");
+  const [bracketContent, setBracketContent] = useState<string | null>(null);
+  const [searchResults, setSearchResults] = useState<PageType[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState<number>(-1);
   const isCancelMode = !!isRunning && !!onCancel;
   const isButtonDisabled = isCancelMode
     ? false
     : !inputValue.trim() || disabled;
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const popupRef = useRef<HTMLDivElement | null>(null);
+
+  // Helper function to find bracket positions and content at cursor position
+  const getBracketPositions = (
+    cursorPos: number,
+    text: string
+  ): { start: number; end: number; content: string } | null => {
+    if (text.length < 4 || cursorPos < 0 || cursorPos > text.length) {
+      return null;
+    }
+
+    // Find the innermost [[ ]] pair containing the cursor
+    // Search backwards from cursor to find opening [[
+    let openBracketStart = -1;
+    let bracketDepth = 0;
+
+    // Search backwards to find the opening [[
+    for (let i = cursorPos - 1; i >= 1; i--) {
+      if (text.substring(i - 1, i + 1) === "[[") {
+        // Found opening bracket
+        if (bracketDepth === 0) {
+          openBracketStart = i - 1;
+          break;
+        } else {
+          bracketDepth--;
+        }
+        i--; // Skip the second bracket
+      } else if (text.substring(i - 1, i + 1) === "]]") {
+        // Found closing bracket while searching backwards
+        bracketDepth++;
+        i--; // Skip the second bracket
+      }
+    }
+
+    // Check if cursor is at the very start and text starts with [[
+    if (
+      openBracketStart === -1 &&
+      cursorPos >= 0 &&
+      cursorPos <= 2 &&
+      text.substring(0, 2) === "[["
+    ) {
+      openBracketStart = 0;
+      bracketDepth = 0;
+    }
+
+    if (openBracketStart === -1) {
+      return null; // No opening bracket found
+    }
+
+    // Search forwards from cursor to find the matching closing ]]
+    bracketDepth = 0;
+    let closeBracketEnd = -1;
+
+    for (let i = cursorPos; i < text.length - 1; i++) {
+      if (text.substring(i, i + 2) === "[[") {
+        // Found nested opening bracket
+        bracketDepth++;
+        i++; // Skip the second bracket
+      } else if (text.substring(i, i + 2) === "]]") {
+        // Found closing bracket
+        if (bracketDepth === 0) {
+          closeBracketEnd = i + 1;
+          break;
+        } else {
+          bracketDepth--;
+        }
+        i++; // Skip the second bracket
+      }
+    }
+
+    if (closeBracketEnd === -1) {
+      return null; // No closing bracket found
+    }
+
+    // Extract content between brackets
+    const contentStart = openBracketStart + 2;
+    const contentEnd = closeBracketEnd - 2;
+
+    // Check if cursor is actually inside the brackets (not on the brackets themselves)
+    // Cursor should be between contentStart (inclusive) and contentEnd + 1 (inclusive)
+    // This means cursor can be right after [[ or right before ]]
+    if (cursorPos < contentStart || cursorPos > contentEnd + 1) {
+      return null;
+    }
+
+    return {
+      start: openBracketStart,
+      end: closeBracketEnd,
+      content: text.substring(contentStart, contentEnd + 1),
+    };
+  };
+
+  // Helper function to find content between [[ ]] brackets at cursor position
+  const getBracketContent = (
+    cursorPos: number,
+    text: string
+  ): string | null => {
+    const positions = getBracketPositions(cursorPos, text);
+    return positions ? positions.content : null;
+  };
+
+  // Function to replace bracket content with selected page name
+  const replaceBracketContent = (pageName: string) => {
+    if (!textareaRef.current) return;
+
+    const cursorPos = textareaRef.current.selectionStart;
+    const positions = getBracketPositions(cursorPos, inputValue);
+    if (!positions) return;
+
+    // Replace the entire bracket including [[ and ]]
+    const newValue =
+      inputValue.substring(0, positions.start) +
+      `[[${pageName}]]` +
+      inputValue.substring(positions.end + 1);
+
+    setInputValue(newValue);
+    setBracketContent(null);
+    setSearchResults([]);
+    setSelectedIndex(-1);
+
+    // Set cursor position after the closing brackets
+    setTimeout(() => {
+      if (textareaRef.current) {
+        const newCursorPos = positions.start + pageName.length + 4; // [[ + pageName + ]]
+        textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+        textareaRef.current.focus();
+      }
+    }, 0);
+  };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Handle arrow keys for navigation when popup is open
+    if (bracketContent !== null && searchResults.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSelectedIndex((prev) =>
+          prev < searchResults.length - 1 ? prev + 1 : prev
+        );
+        return;
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev > 0 ? prev - 1 : -1));
+        return;
+      } else if (e.key === "Enter" && !e.shiftKey && selectedIndex >= 0) {
+        e.preventDefault();
+        const selectedPage = searchResults[selectedIndex];
+        const pageName = selectedPage.originalName ?? selectedPage.name ?? null;
+        if (pageName) {
+          replaceBracketContent(pageName);
+        }
+        return;
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        setBracketContent(null);
+        setSearchResults([]);
+        setSelectedIndex(-1);
+        return;
+      }
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (isCancelMode) {
@@ -105,9 +269,25 @@ export function ChatInput({
     }
   }, [inputValue]);
 
+  // Scroll selected item into view when navigating with keyboard
+  useEffect(() => {
+    if (selectedIndex >= 0 && popupRef.current) {
+      const selectedElement = popupRef.current.children[
+        selectedIndex
+      ] as HTMLElement;
+      if (selectedElement) {
+        selectedElement.scrollIntoView({
+          block: "nearest",
+          behavior: "smooth",
+        });
+      }
+    }
+  }, [selectedIndex]);
+
   return (
     <div
       className={className}
+      style={{ position: "relative" }}
       onMouseDownCapture={(e) => {
         if (disabled) return;
         const target = e.target as HTMLElement;
@@ -133,10 +313,66 @@ export function ChatInput({
         }
       }}
     >
+      {bracketContent !== null && searchResults.length > 0 && (
+        <div
+          ref={popupRef}
+          className="absolute bottom-full w-full bg-gray-100 border max-h-48 overflow-y-auto"
+          style={{ marginBottom: 0 }}
+        >
+          {searchResults.map((page, index) => {
+            const pageName = page.originalName ?? page.name ?? "";
+            const isSelected = index === selectedIndex;
+            return (
+              <div
+                key={page.uuid}
+                className={`p-2 cursor-pointer ${
+                  isSelected ? "bg-blue-200" : "hover:bg-gray-200"
+                }`}
+                onClick={() => {
+                  if (pageName) {
+                    replaceBracketContent(pageName);
+                  }
+                }}
+                onMouseEnter={() => setSelectedIndex(index)}
+              >
+                {pageName}
+              </div>
+            );
+          })}
+        </div>
+      )}
       <textarea
         ref={textareaRef}
         value={inputValue}
-        onChange={(e) => setInputValue(e.target.value)}
+        onChange={(e) => {
+          const newValue = e.target.value;
+          setInputValue(newValue);
+
+          // Check if cursor is inside [[ ]] brackets after the change
+          setTimeout(() => {
+            if (textareaRef.current) {
+              const cursorPos = textareaRef.current.selectionStart;
+              const content = getBracketContent(cursorPos, newValue);
+              if (content !== null) {
+                setBracketContent(content);
+                setSelectedIndex(-1);
+                searchPage(content)
+                  .then((results) => {
+                    setSearchResults(results);
+                  })
+                  .catch((error) => {
+                    // Handle error
+                    console.error("Error searching page refs:", error);
+                    setSearchResults([]);
+                  });
+              } else {
+                setBracketContent(null);
+                setSearchResults([]);
+                setSelectedIndex(-1);
+              }
+            }
+          }, 0);
+        }}
         onKeyDown={handleKeyPress}
         placeholder="Type your message here..."
         className="w-full rounded-xl flex-1 resize-none border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none block pt-4 px-6"

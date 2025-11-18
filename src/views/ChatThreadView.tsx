@@ -5,8 +5,12 @@ import {
   type Message,
   type BlockMessage,
   deleteAllMessagesAfterBlock,
-} from "../querier";
-import { appendMessageToThread, loadThreadMessageBlocks } from "../querier";
+  searchPagesByName,
+} from "../services/querier";
+import {
+  appendMessageToThread,
+  loadThreadMessageBlocks,
+} from "../services/querier";
 import {
   spawnCompletionJobForPage,
   getCompletionJobStatus,
@@ -143,6 +147,7 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
         disabled={jobActive}
         isRunning={jobActive}
         onCancel={() => cancelCompletionJob(pageId)}
+        searchPage={searchPagesByName}
       />
     </>
   );

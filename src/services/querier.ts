@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { filterPropertyLines } from "./utils";
+import { filterPropertyLines } from "../utils";
 import type { BlockEntity } from "@logseq/libs/dist/LSPlugin.user";
 
 // Note: this comment on GitHub helped a lot:
@@ -183,4 +183,45 @@ export const appendMessageToThread = async (
   await logseq.Editor.appendBlockInPage(pageUuid, message.content, {
     properties: { role: message.role },
   });
+};
+
+export const searchPagesByName = async (
+  searchQuery: string
+): Promise<PageType[]> => {
+  // Return empty array for empty search queries
+  if (!searchQuery || searchQuery.trim() === "") {
+    return [];
+  }
+
+  // Escape special characters in the search query for use in datascript
+  // Clojure string literals need backslashes, quotes, and control characters escaped
+  const escapedQuery = searchQuery
+    .replace(/\\/g, "\\\\") // Escape backslashes first
+    .replace(/"/g, '\\"') // Escape double quotes
+    .replace(/\n/g, "\\n") // Escape newlines
+    .replace(/\r/g, "\\r") // Escape carriage returns
+    .replace(/\t/g, "\\t") // Escape tabs
+    .trim()
+    .toLowerCase();
+
+  console.log(escapedQuery);
+
+  const result = await logseq.DB.datascriptQuery(`[:find (pull ?p [*])
+       :where
+       [?p :block/name ?name]
+       [(clojure.string/includes? ?name "${escapedQuery}")]]`);
+
+  const pages = z
+    .union([z.array(z.array(z.unknown())), z.null(), z.undefined()])
+    .parse(result);
+
+  // Flatten and limit results to 50 for performance
+  const allPages = (pages ?? [])
+    .flat()
+    .map((p) =>
+      PageType.safeParse(p).success ? PageType.safeParse(p).data : null
+    )
+    .filter((p): p is PageType => p !== null);
+
+  return allPages;
 };

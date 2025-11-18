@@ -4,7 +4,8 @@ import {
   appendMessageToThread,
   createChatThreadPage,
   type Message,
-} from "../querier";
+  searchPagesByName,
+} from "../services/querier";
 import {
   spawnCompletionJobForPage,
   subscribeToCompletionJobs,
@@ -93,6 +94,7 @@ export function NewChatView({ onThreadCreated }: NewChatViewProps) {
             cancelCompletionJob(pageId);
           }
         }}
+        searchPage={searchPagesByName}
       />
     </>
   );
