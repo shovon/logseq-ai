@@ -143,6 +143,10 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
         disabled={jobActive}
         isRunning={jobActive}
         onCancel={() => cancelCompletionJob(pageId)}
+        onPageRefSearch={async (_content: string) => {
+          // TODO: Implement page reference search
+          return [];
+        }}
       />
     </>
   );

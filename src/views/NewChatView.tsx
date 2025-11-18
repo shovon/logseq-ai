@@ -93,6 +93,10 @@ export function NewChatView({ onThreadCreated }: NewChatViewProps) {
             cancelCompletionJob(pageId);
           }
         }}
+        onPageRefSearch={async (_content: string) => {
+          // TODO: Implement page reference search
+          return [];
+        }}
       />
     </>
   );

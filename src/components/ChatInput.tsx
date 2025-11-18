@@ -7,7 +7,7 @@ interface ChatInputProps {
   isRunning?: boolean;
   onCancel?: () => void;
   className?: string;
-  onPageRefChange?: (content: string) => void;
+  onPageRefSearch: (content: string) => Promise<Array<unknown>>;
 }
 
 export function ChatInput({
@@ -16,7 +16,7 @@ export function ChatInput({
   onCancel,
   className,
   disabled = false,
-  onPageRefChange,
+  onPageRefSearch,
 }: ChatInputProps) {
   const [inputValue, setInputValue] = useState<string>("");
   const isCancelMode = !!isRunning && !!onCancel;
@@ -234,7 +234,14 @@ export function ChatInput({
               const cursorPos = textareaRef.current.selectionStart;
               const content = getBracketContent(cursorPos, newValue);
               if (content !== null) {
-                onPageRefChange?.(content);
+                onPageRefSearch(content)
+                  .then(() => {
+                    // Handle successful search results
+                  })
+                  .catch((error) => {
+                    // Handle error
+                    console.error("Error searching page refs:", error);
+                  });
               }
             }
           }, 0);
