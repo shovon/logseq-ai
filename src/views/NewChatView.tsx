@@ -94,7 +94,7 @@ export function NewChatView({ onThreadCreated }: NewChatViewProps) {
             cancelCompletionJob(pageId);
           }
         }}
-        onPageRefSearch={searchPagesByName}
+        searchPage={searchPagesByName}
       />
     </>
   );
