@@ -24,7 +24,7 @@ export function ChatInput({
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (isCancelMode) {
@@ -32,6 +32,37 @@ export function ChatInput({
       } else if (!disabled) {
         onSend(inputValue);
         setInputValue("");
+      }
+    } else if (e.key === "[" && !e.shiftKey) {
+      // Auto-close brackets
+      e.preventDefault();
+      if (textareaRef.current) {
+        const textarea = textareaRef.current;
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const newValue =
+          inputValue.substring(0, start) + "[]" + inputValue.substring(end);
+        setInputValue(newValue);
+        // Position cursor between the brackets
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.setSelectionRange(start + 1, start + 1);
+          }
+        }, 0);
+      }
+    } else if (e.key === "]" && !e.shiftKey) {
+      // Skip over auto-inserted closing brackets
+      if (textareaRef.current) {
+        const textarea = textareaRef.current;
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        if (
+          start === end &&
+          textarea.value.substring(start, start + 1) === "]"
+        ) {
+          e.preventDefault();
+          textarea.setSelectionRange(start + 1, start + 1);
+        }
       }
     }
   };
