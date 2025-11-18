@@ -216,8 +216,12 @@ export const searchPagesByName = async (
     .parse(result);
 
   // Flatten and limit results to 50 for performance
-  const allPages = (pages ?? []).flat().map((p) => PageType.parse(p));
+  const allPages = (pages ?? [])
+    .flat()
+    .map((p) =>
+      PageType.safeParse(p).success ? PageType.safeParse(p).data : null
+    )
+    .filter((p): p is PageType => p !== null);
 
-  console.log(allPages);
   return allPages;
 };
