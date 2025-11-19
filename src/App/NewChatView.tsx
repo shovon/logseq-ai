@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ChatInput } from "../components/ChatInput";
+import { ChatInput } from "./components/ChatInput";
 import {
   appendMessageToThread,
   createChatThreadPage,

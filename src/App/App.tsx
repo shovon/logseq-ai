@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
-import { NewChatView } from "./views/NewChatView";
-import { ChatThreadView } from "./views/ChatThreadView";
-import { ChatHistoryView } from "./views/ChatHistoryView";
-import { ApiKeySetupView } from "./views/ApiKeySetupView";
-import { onRouteChanged } from "./services/route-change-service";
+import { NewChatView } from "./NewChatView";
+import { ChatThreadView } from "./ChatThreadView";
+import { ChatHistoryView } from "./ChatHistoryView";
+import { ApiKeySetupView } from "./ApiKeySetupView";
+import { onRouteChanged } from "../services/route-change-service";
 import { IconEdit, IconHistory } from "@tabler/icons-react";
 
 type AppView =

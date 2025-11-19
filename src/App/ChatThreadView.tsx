@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { ChatInput } from "../components/ChatInput";
-import { MessageList } from "../components/MessageList/MessageList";
+import { ChatInput } from "./components/ChatInput";
+import { MessageList } from "./components/MessageList/MessageList";
 import {
   type Message,
   type BlockMessage,

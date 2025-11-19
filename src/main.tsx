@@ -2,7 +2,7 @@ import "@logseq/libs";
 
 import { createRoot } from "react-dom/client";
 import "./index.css";
-import App from "./App.tsx";
+import App from "./App/App.tsx";
 import { onReady } from "./services/ready-service.ts";
 import { initializeSidebarStuff } from "./sidebar-stuff.ts";
 
