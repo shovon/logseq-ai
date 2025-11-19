@@ -26,15 +26,29 @@ const markdownComponents: Components = {
       /^\[\[([^\]]+)\]\]$/.test(children)
     ) {
       // const pageName = decodeURIComponent(href.replace("logseq://page/", ""));
+      const pageName = children.slice(2, -2);
       return (
         <a
           {...remainder}
           href="#"
-          onClick={(e) => {
+          onClick={async (e) => {
             e.preventDefault();
-            logseq.App.pushState("page", {
-              name: children.slice(2, -2),
-            });
+            if (e.shiftKey) {
+              // Shift-click: open page in sidebar
+              try {
+                const page = await logseq.Editor.getPage(pageName);
+                if (page?.uuid) {
+                  await logseq.Editor.openInRightSidebar(page.uuid);
+                }
+              } catch (error) {
+                console.error("Error opening page in sidebar:", error);
+              }
+            } else {
+              // Regular click: navigate to page
+              logseq.App.pushState("page", {
+                name: pageName,
+              });
+            }
           }}
           className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium"
         >
