@@ -202,6 +202,37 @@ export function MessageList({
     scrollToBottom();
   }, [jobActive, scrollToBottom]);
 
+  // Auto-scroll when content changes (e.g., during streaming)
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    // Track previous scrollHeight to detect changes
+    let lastScrollHeight = container.scrollHeight;
+
+    const mutationObserver = new MutationObserver(() => {
+      // Check if scrollHeight changed
+      if (container.scrollHeight !== lastScrollHeight) {
+        lastScrollHeight = container.scrollHeight;
+        // Only scroll if user was already at bottom
+        if (isUserAtBottom) {
+          scrollToBottom();
+        }
+      }
+    });
+
+    // Observe changes to child elements (content additions/modifications)
+    mutationObserver.observe(container, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+
+    return () => {
+      mutationObserver.disconnect();
+    };
+  }, [isUserAtBottom, scrollToBottom]);
+
   return (
     <div
       ref={scrollContainerRef}
