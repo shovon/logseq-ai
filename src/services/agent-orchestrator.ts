@@ -1,3 +1,5 @@
+// TODO: perhaps get rid of this.
+
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { z } from "zod";

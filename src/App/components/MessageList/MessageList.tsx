@@ -3,7 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
-import { filterPropertyLines } from "../../../utils";
+import { filterPropertyLines } from "../../../utils/utils";
 import type { BlockMessage } from "../../../services/querier";
 import type { Components } from "react-markdown";
 import { remarkLogseqPageRefs } from "./remark-logseq-page-refs";

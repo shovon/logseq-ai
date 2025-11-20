@@ -1,5 +1,7 @@
 import type { Message } from "./querier";
-import { transformDashBulletPointsToStars } from "../utils";
+import { transformDashBulletPointsToStars } from "../utils/utils";
+
+// TODO: get rid of this.
 
 // jobRegistry.ts
 export type JobStatus =
