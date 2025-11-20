@@ -54,20 +54,15 @@ export async function startCompletionJob(
   try {
     const stream = runCompletion({ input, messages, signal: abort.signal });
 
-    const block = await logseq.Editor.appendBlockInPage(pageId, "", {
-      properties: { role: "assistant" },
-    });
+    let content = "role:: assistant\n";
+    const block = await logseq.Editor.appendBlockInPage(pageId, content);
     if (!block?.uuid) throw new Error("Failed to append block");
 
-    let content = "";
     for await (const chunk of stream) {
       content += chunk;
       await logseq.Editor.updateBlock(
         block.uuid,
-        transformDashBulletPointsToStars(content),
-        {
-          properties: { role: "assistant" },
-        }
+        transformDashBulletPointsToStars(content)
       );
     }
 
