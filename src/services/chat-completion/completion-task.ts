@@ -1,9 +1,9 @@
-import { type Task } from "../utils/task-runner-repository/task-runner-repository";
-import type { Message } from "./querier";
+import { type Task } from "../../utils/task-runner-repository/task-runner-repository";
+import type { Message } from "../logseq/querier";
 import { runCompletion } from "./chat-completion";
-import { transformDashBulletPointsToStars } from "../utils/utils";
+import { transformDashBulletPointsToStars } from "../../utils/utils";
 import { from } from "rxjs";
-import type { JobKey, RunningState } from "./completion-task-runners";
+import type { JobKey, RunningState } from "./task-runner";
 
 export const simpleCompletion: (
   input: string,

@@ -5,9 +5,9 @@ import {
   createChatThreadPage,
   type Message,
   searchPagesByName,
-} from "../services/querier";
-import { completionTaskRunnerRepository } from "../services/completion-task-runners";
-import { simpleCompletion } from "../services/chat-completion-tasks";
+} from "../services/logseq/querier";
+import { completionTaskRunnerRepository } from "../services/chat-completion/task-runner";
+import { simpleCompletion } from "../services/chat-completion/completion-task";
 import { transformDashBulletPointsToStars } from "../utils/utils";
 
 interface NewChatViewProps {

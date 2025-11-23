@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from "react";
 import { IconArrowUp } from "@tabler/icons-react";
-import type { PageType } from "../../services/querier";
+import type { PageType } from "../../services/logseq/querier";
 
 interface ChatInputProps {
   onSend: (value: string) => void;

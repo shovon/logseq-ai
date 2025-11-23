@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { getAllChatThreads, type PageType } from "../services/querier";
+import { getAllChatThreads, type PageType } from "../services/logseq/querier";
 import { categorizeDateByPeriod, type TimePeriod } from "../utils/utils";
-import { onRouteChanged } from "../services/route-change-service";
+import { onRouteChanged } from "../services/logseq/route-change-service";
 
 interface ChatHistoryViewProps {
   onThreadSelect: (threadUuid: string) => void;

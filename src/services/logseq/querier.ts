@@ -2,7 +2,7 @@
 //   sort.
 
 import { z } from "zod";
-import { filterPropertyLines } from "../utils/utils";
+import { filterPropertyLines } from "../../utils/utils";
 import type { BlockEntity } from "@logseq/libs/dist/LSPlugin.user";
 
 // Note: this comment on GitHub helped a lot:

@@ -6,13 +6,13 @@ import {
   type BlockMessage,
   deleteAllMessagesAfterBlock,
   searchPagesByName,
-} from "../services/querier";
+} from "../services/logseq/querier";
 import {
   appendMessageToThread,
   loadThreadMessageBlocks,
-} from "../services/querier";
-import { completionTaskRunnerRepository } from "../services/completion-task-runners";
-import { simpleCompletion } from "../services/chat-completion-tasks";
+} from "../services/logseq/querier";
+import { completionTaskRunnerRepository } from "../services/chat-completion/task-runner";
+import { simpleCompletion } from "../services/chat-completion/completion-task";
 import { transformDashBulletPointsToStars } from "../utils/utils";
 
 interface ChatThreadViewProps {

@@ -3,7 +3,7 @@ import { NewChatView } from "./NewChatView";
 import { ChatThreadView } from "./ChatThreadView";
 import { ChatHistoryView } from "./ChatHistoryView";
 import { ApiKeySetupView } from "./ApiKeySetupView";
-import { onRouteChanged } from "../services/route-change-service";
+import { onRouteChanged } from "../services/logseq/route-change-service";
 import { IconEdit, IconHistory } from "@tabler/icons-react";
 
 type AppView =

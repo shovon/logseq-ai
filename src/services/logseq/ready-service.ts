@@ -1,4 +1,4 @@
-import { gate } from "../utils/utils";
+import { gate } from "../../utils/utils";
 
 const readyGate = gate();
 

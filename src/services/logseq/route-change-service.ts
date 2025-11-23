@@ -1,4 +1,4 @@
-import { subject } from "../utils/subject/subject";
+import { subject } from "../../utils/subject/subject";
 import { onReady } from "./ready-service";
 
 const routeChangedSubject = subject<void>();

@@ -1,25 +1,11 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
-import type { Message } from "./querier";
-import type { JobStatus } from "./job-registry";
-import {
-  startCompletionJob,
-  cancelCompletionJob as cancelJob,
-  getStatus as getJobStatus,
-  subscribe as subscribeToJobs,
-} from "./job-registry";
+import type { Message } from "../logseq/querier";
 import { buildEnhancedMessage } from "./agent-orchestrator";
 
 const SYSTEM_PROMPT = `You are a helpful AI assistant integrated with Logseq. Help users with their questions and tasks.
 
 Just note, when a user uses the \`[[SOME PAGE NAME]]\` syntax, they are referring to a page, and you can find it in the page references list.`;
-
-export function spawnCompletionJobForPage(
-  pageId: string,
-  { input, messages }: { input: string; messages: Message[] }
-) {
-  return startCompletionJob(pageId, input, messages, runCompletion);
-}
 
 export async function* runCompletion({
   input,
@@ -65,18 +51,4 @@ async function buildPromptWithContext(
     ...messages,
     { role: "user" as const, content: enhancedMessage },
   ];
-}
-
-export function cancelCompletionJob(pageId: string) {
-  cancelJob(pageId);
-}
-
-export function getCompletionJobStatus(pageId: string) {
-  return getJobStatus(pageId);
-}
-
-export function subscribeToCompletionJobs(
-  listener: (pageId: string, status: JobStatus) => void
-) {
-  return subscribeToJobs(listener);
 }
