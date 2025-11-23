@@ -1,28 +1,3 @@
-/**
- * Returns an event emitter.
- * @returns An object containing a function to add an event listener, and one
- *   to push events to add to the listener.
- */
-export function subject<T>() {
-  const listeners = new Set<(v: T) => void>();
-  let last: [T] | null = null;
-  return {
-    listen: (listener: (v: T) => void, immediate = false) => {
-      if (last !== null && immediate) listener(last[0]);
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
-    next: (v: T) => {
-      last = [v];
-      for (const listener of listeners) {
-        listener(v);
-      }
-    },
-  };
-}
-
 export function gate() {
   const listeners = new Set<() => void>();
   let done = false;
@@ -30,6 +5,9 @@ export function gate() {
     listen: (listener: () => void) => {
       if (done) listener();
       else listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
     },
     open: () => {
       if (done) return;
@@ -40,6 +18,17 @@ export function gate() {
       }
     },
   };
+}
+
+export function subscribeToPromise<T>(
+  subscribe: (listener: (v: T) => void) => () => void
+): Promise<T> {
+  return new Promise<T>((resolve) => {
+    const unsubscribe = subscribe((v) => {
+      resolve(v);
+      unsubscribe();
+    });
+  });
 }
 
 // Filter out lines matching "key:: value\n" pattern that are contiguously

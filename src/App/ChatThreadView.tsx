@@ -11,14 +11,9 @@ import {
   appendMessageToThread,
   loadThreadMessageBlocks,
 } from "../services/querier";
-import {
-  spawnCompletionJobForPage,
-  getCompletionJobStatus,
-  subscribeToCompletionJobs,
-  cancelCompletionJob,
-} from "../services/chat-completion";
-import type { JobStatus } from "../services/job-registry";
-import { transformDashBulletPointsToStars } from "../utils";
+import { completionTaskRunnerRepository } from "../services/completion-task-runners";
+import { simpleCompletion } from "../services/chat-completion-tasks";
+import { transformDashBulletPointsToStars } from "../utils/utils";
 
 interface ChatThreadViewProps {
   pageId: string;
@@ -26,9 +21,11 @@ interface ChatThreadViewProps {
 
 export function ChatThreadView({ pageId }: ChatThreadViewProps) {
   const [messages, setMessages] = useState<BlockMessage[]>([]);
-  const [jobStatus, setJobStatus] = useState<JobStatus>(() =>
-    getCompletionJobStatus(pageId)
-  );
+  const [jobActive, setJobActive] = useState<boolean>(() => {
+    const stateNode =
+      completionTaskRunnerRepository.getTaskRunnerStateNode(pageId);
+    return stateNode.type === "running";
+  });
 
   useEffect(
     () =>
@@ -57,12 +54,16 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
   }, [pageId]);
 
   useEffect(() => {
-    setJobStatus(getCompletionJobStatus(pageId));
-    const unsubscribe = subscribeToCompletionJobs((id, status) => {
-      if (id === pageId) {
-        setJobStatus(status);
+    const stateNode =
+      completionTaskRunnerRepository.getTaskRunnerStateNode(pageId);
+    setJobActive(stateNode.type === "running");
+
+    const unsubscribe = completionTaskRunnerRepository.listen(
+      pageId,
+      (state) => {
+        setJobActive(state.type === "running");
       }
-    });
+    );
 
     return () => {
       unsubscribe();
@@ -92,10 +93,11 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
       } as Message);
 
       // Spawn completion job for assistant reply
-      await spawnCompletionJobForPage(pageId, {
-        input: currentInput,
-        messages: priorMessages,
-      });
+      const stateNode =
+        completionTaskRunnerRepository.getTaskRunnerStateNode(pageId);
+      if (stateNode.type === "idle") {
+        stateNode.run(simpleCompletion(currentInput, priorMessages));
+      }
     } catch (e) {
       logseq.UI.showMsg(`${e ?? ""}`, "error");
     }
@@ -122,17 +124,21 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
       })) as Message[];
 
       // Spawn completion job for assistant reply
-      await spawnCompletionJobForPage(pageId, {
-        input: transformDashBulletPointsToStars(newContent),
-        messages: priorMessages,
-      });
+      const stateNode =
+        completionTaskRunnerRepository.getTaskRunnerStateNode(pageId);
+      if (stateNode.type === "idle") {
+        stateNode.run(
+          simpleCompletion(
+            transformDashBulletPointsToStars(newContent),
+            priorMessages
+          )
+        );
+      }
     } catch (e) {
       console.error("Error updating message:", e);
       logseq.UI.showMsg(`Error updating message: ${e ?? ""}`, "error");
     }
   };
-
-  const jobActive = jobStatus.state === "running";
 
   return (
     <>
@@ -146,7 +152,13 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
         onSend={handleSendMessage}
         disabled={jobActive}
         isRunning={jobActive}
-        onCancel={() => cancelCompletionJob(pageId)}
+        onCancel={() => {
+          const stateNode =
+            completionTaskRunnerRepository.getTaskRunnerStateNode(pageId);
+          if (stateNode.type === "running") {
+            stateNode.stop();
+          }
+        }}
         searchPage={searchPagesByName}
       />
     </>
