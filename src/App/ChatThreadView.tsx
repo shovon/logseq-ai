@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ChatInput } from "./components/ChatInput";
 import { MessageList } from "./components/MessageList/MessageList";
 import {
@@ -19,56 +19,55 @@ interface ChatThreadViewProps {
   pageId: string;
 }
 
-export function ChatThreadView({ pageId }: ChatThreadViewProps) {
-  const [messages, setMessages] = useState<BlockMessage[]>([]);
-  const [jobActive, setJobActive] = useState<boolean>(() => {
-    const stateNode =
-      completionTaskRunnerRepository.getTaskRunnerStateNode(pageId);
-    return stateNode.type === "running";
+function useTaskStateMachine(pageId: string) {
+  const [stateNode, setStateNode] = useState(() => {
+    return completionTaskRunnerRepository.getTaskRunnerStateNode(pageId);
   });
 
-  useEffect(
-    () =>
-      logseq.DB.onChanged(() => {
-        loadThreadMessageBlocks(pageId)
-          .then((loadedMessages) => {
-            setMessages(loadedMessages);
-          })
-          .catch((error) => {
-            console.error("Error loading thread messages:", error);
-            logseq.UI.showMsg(`Error loading messages: ${error}`, "error");
-          });
-      }),
-    [pageId]
-  );
-
-  useEffect(() => {
-    loadThreadMessageBlocks(pageId)
-      .then((loadedMessages) => {
-        setMessages(loadedMessages);
-      })
-      .catch((error) => {
-        console.error("Error loading thread messages:", error);
-        logseq.UI.showMsg(`Error loading messages: ${error}`, "error");
-      });
-  }, [pageId]);
-
   useEffect(() => {
     const stateNode =
       completionTaskRunnerRepository.getTaskRunnerStateNode(pageId);
-    setJobActive(stateNode.type === "running");
+    setStateNode(stateNode);
 
-    const unsubscribe = completionTaskRunnerRepository.listen(
-      pageId,
-      (state) => {
-        setJobActive(state.type === "running");
-      }
-    );
+    const unsubscribe = completionTaskRunnerRepository.listen(pageId, () => {
+      setStateNode(
+        completionTaskRunnerRepository.getTaskRunnerStateNode(pageId)
+      );
+    });
 
     return () => {
       unsubscribe();
     };
   }, [pageId]);
+
+  return stateNode;
+}
+
+export function ChatThreadView({ pageId }: ChatThreadViewProps) {
+  const [messages, setMessages] = useState<BlockMessage[]>([]);
+  const completionStateNode = useTaskStateMachine(pageId);
+
+  // TODO: is this even necessary?
+  const jobActive = completionStateNode.type === "running";
+
+  const loadMessages = useMemo(
+    () => () => {
+      loadThreadMessageBlocks(pageId)
+        .then((loadedMessages) => {
+          setMessages(loadedMessages);
+        })
+        .catch((error) => {
+          console.error("Error loading thread messages:", error);
+          logseq.UI.showMsg(`Error loading messages: ${error}`, "error");
+        });
+    },
+    [pageId]
+  );
+
+  useEffect(() => logseq.DB.onChanged(loadMessages), [loadMessages]);
+  useEffect(() => {
+    loadMessages();
+  }, [loadMessages]);
 
   const handleSendMessage = async (value: string) => {
     const currentInput = transformDashBulletPointsToStars(value);
@@ -144,7 +143,7 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
     <>
       <MessageList
         messages={messages}
-        jobActive={jobActive}
+        completionMachineNode={completionStateNode}
         onEdit={handleEditMessage}
       />
       <ChatInput

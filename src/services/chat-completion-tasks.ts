@@ -19,13 +19,14 @@ export const simpleCompletion: (
           signal: abortSignal,
         });
 
-        yield { type: "streaming" };
-
         let content = "role:: assistant\n";
         const block = await logseq.Editor.appendBlockInPage(jobKey, content);
         if (!block?.uuid) throw new Error("Failed to append block");
 
+        let isStreaming = false;
         for await (const chunk of stream) {
+          if (!isStreaming) yield { type: "streaming" };
+          isStreaming = true;
           if (abortSignal.aborted) return;
           content += chunk;
           await logseq.Editor.updateBlock(
