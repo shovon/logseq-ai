@@ -26,7 +26,6 @@ function App() {
       if (currentViewState.type === "CHAT_THREAD") {
         logseq.Editor.getPage(currentViewState.pageId)
           .then((page) => {
-            console.log(page);
             if (isDone) return;
             if (!page) {
               navigateToNewChat();

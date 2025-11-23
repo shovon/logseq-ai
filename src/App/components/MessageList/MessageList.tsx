@@ -8,10 +8,11 @@ import type { BlockMessage } from "../../../services/querier";
 import type { Components } from "react-markdown";
 import { remarkLogseqPageRefs } from "./remark-logseq-page-refs";
 import { IconPencil } from "@tabler/icons-react";
+import type { CompletionMachineNode } from "../../../services/completion-task-runners";
 
 interface MessageListProps {
   messages: BlockMessage[];
-  jobActive?: boolean;
+  completionMachineNode: CompletionMachineNode;
   onEdit?: (blockId: string, newContent: string) => void;
 }
 
@@ -179,11 +180,12 @@ function AssistantMessage({ content }: MessageContentProps) {
 
 export function MessageList({
   messages,
-  jobActive = false,
+  completionMachineNode,
   onEdit,
 }: MessageListProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isUserAtBottom, setIsUserAtBottom] = useState<boolean>(true);
+  const jobActive = completionMachineNode.type === "running";
 
   // Check if user is scrolled to bottom
   const checkIfAtBottom = () => {
@@ -268,7 +270,10 @@ export function MessageList({
           <AssistantMessage key={index} content={message.message.content} />
         )
       )}
-      {jobActive && <AssistantMessage content="Thinking..." />}
+      {completionMachineNode.type === "running" &&
+        !completionMachineNode.data && (
+          <AssistantMessage content="Thinking..." />
+        )}
     </div>
   );
 }

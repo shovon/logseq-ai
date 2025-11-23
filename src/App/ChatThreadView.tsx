@@ -19,37 +19,38 @@ interface ChatThreadViewProps {
   pageId: string;
 }
 
-// TODO: this should really be placed
-function useIsJobActive(pageId: string) {
-  const [jobActive, setJobActive] = useState<boolean>(false);
+function useTaskStateMachine(pageId: string) {
+  const [stateNode, setStateNode] = useState(() => {
+    return completionTaskRunnerRepository.getTaskRunnerStateNode(pageId);
+  });
 
   useEffect(() => {
     const stateNode =
       completionTaskRunnerRepository.getTaskRunnerStateNode(pageId);
-    setJobActive(stateNode.type === "running");
+    setStateNode(stateNode);
 
-    const unsubscribe = completionTaskRunnerRepository.listen(
-      pageId,
-      (state) => {
-        setJobActive(state.type === "running");
-      }
-    );
+    const unsubscribe = completionTaskRunnerRepository.listen(pageId, () => {
+      setStateNode(
+        completionTaskRunnerRepository.getTaskRunnerStateNode(pageId)
+      );
+    });
 
     return () => {
       unsubscribe();
     };
   }, [pageId]);
 
-  return jobActive;
+  return stateNode;
 }
 
 export function ChatThreadView({ pageId }: ChatThreadViewProps) {
   const [messages, setMessages] = useState<BlockMessage[]>([]);
+  const completionStateNode = useTaskStateMachine(pageId);
 
   // TODO: is this even necessary?
-  const jobActive = useIsJobActive(pageId);
+  const jobActive = completionStateNode.type === "running";
 
-  const laodMessages = useMemo(
+  const loadMessages = useMemo(
     () => () => {
       loadThreadMessageBlocks(pageId)
         .then((loadedMessages) => {
@@ -63,10 +64,10 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
     [pageId]
   );
 
-  useEffect(() => logseq.DB.onChanged(laodMessages), [laodMessages]);
+  useEffect(() => logseq.DB.onChanged(loadMessages), [loadMessages]);
   useEffect(() => {
-    laodMessages();
-  }, [laodMessages]);
+    loadMessages();
+  }, [loadMessages]);
 
   const handleSendMessage = async (value: string) => {
     const currentInput = transformDashBulletPointsToStars(value);
@@ -142,7 +143,7 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
     <>
       <MessageList
         messages={messages}
-        jobActive={jobActive}
+        completionMachineNode={completionStateNode}
         onEdit={handleEditMessage}
       />
       <ChatInput
