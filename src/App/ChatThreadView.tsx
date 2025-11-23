@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ChatInput } from "./components/ChatInput";
 import { MessageList } from "./components/MessageList/MessageList";
 import {
@@ -19,39 +19,9 @@ interface ChatThreadViewProps {
   pageId: string;
 }
 
-export function ChatThreadView({ pageId }: ChatThreadViewProps) {
-  const [messages, setMessages] = useState<BlockMessage[]>([]);
-  const [jobActive, setJobActive] = useState<boolean>(() => {
-    const stateNode =
-      completionTaskRunnerRepository.getTaskRunnerStateNode(pageId);
-    return stateNode.type === "running";
-  });
-
-  useEffect(
-    () =>
-      logseq.DB.onChanged(() => {
-        loadThreadMessageBlocks(pageId)
-          .then((loadedMessages) => {
-            setMessages(loadedMessages);
-          })
-          .catch((error) => {
-            console.error("Error loading thread messages:", error);
-            logseq.UI.showMsg(`Error loading messages: ${error}`, "error");
-          });
-      }),
-    [pageId]
-  );
-
-  useEffect(() => {
-    loadThreadMessageBlocks(pageId)
-      .then((loadedMessages) => {
-        setMessages(loadedMessages);
-      })
-      .catch((error) => {
-        console.error("Error loading thread messages:", error);
-        logseq.UI.showMsg(`Error loading messages: ${error}`, "error");
-      });
-  }, [pageId]);
+// TODO: this should really be placed
+function useIsJobActive(pageId: string) {
+  const [jobActive, setJobActive] = useState<boolean>(false);
 
   useEffect(() => {
     const stateNode =
@@ -69,6 +39,34 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
       unsubscribe();
     };
   }, [pageId]);
+
+  return jobActive;
+}
+
+export function ChatThreadView({ pageId }: ChatThreadViewProps) {
+  const [messages, setMessages] = useState<BlockMessage[]>([]);
+
+  // TODO: is this even necessary?
+  const jobActive = useIsJobActive(pageId);
+
+  const laodMessages = useMemo(
+    () => () => {
+      loadThreadMessageBlocks(pageId)
+        .then((loadedMessages) => {
+          setMessages(loadedMessages);
+        })
+        .catch((error) => {
+          console.error("Error loading thread messages:", error);
+          logseq.UI.showMsg(`Error loading messages: ${error}`, "error");
+        });
+    },
+    [pageId]
+  );
+
+  useEffect(() => logseq.DB.onChanged(laodMessages), [laodMessages]);
+  useEffect(() => {
+    laodMessages();
+  }, [laodMessages]);
 
   const handleSendMessage = async (value: string) => {
     const currentInput = transformDashBulletPointsToStars(value);
