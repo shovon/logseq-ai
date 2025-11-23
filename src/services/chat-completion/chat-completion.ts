@@ -7,6 +7,13 @@ const SYSTEM_PROMPT = `You are a helpful AI assistant integrated with Logseq. He
 
 Just note, when a user uses the \`[[SOME PAGE NAME]]\` syntax, they are referring to a page, and you can find it in the page references list.`;
 
+/**
+ * This is just a simple completion helper; abstracts prompting to text stream
+ * conversion, and it is not exclusive to prompts to generate text that shows up
+ * on screen; could also be used for multi-shot prompting.
+ * @param options Parameters for the run completion job
+ * @returns An async iterable containing all the message deltas
+ */
 export async function* runCompletion({
   input,
   messages,

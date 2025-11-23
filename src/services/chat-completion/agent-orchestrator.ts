@@ -3,7 +3,7 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { buildPageContext } from "../context-builder";
+import { buildPageContext } from "./context-builder";
 
 /**
  * Detects user intent from their message
