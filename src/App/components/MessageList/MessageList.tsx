@@ -19,7 +19,6 @@ interface MessageListProps {
 // Shared markdown component configuration for handling Logseq page references
 const markdownComponents: Components = {
   a: ({ node: _, href, children, ...remainder }) => {
-    console.log(children);
     // Check if this is a Logseq page reference link
     if (
       href === "#" &&

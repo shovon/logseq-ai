@@ -207,8 +207,6 @@ export const searchPagesByName = async (
     .trim()
     .toLowerCase();
 
-  console.log(escapedQuery);
-
   const result = await logseq.DB.datascriptQuery(`[:find (pull ?p [*])
        :where
        [?p :block/name ?name]
