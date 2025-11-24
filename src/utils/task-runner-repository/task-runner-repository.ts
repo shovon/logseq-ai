@@ -177,7 +177,8 @@ export function createTaskRunnerRepository<Key, RunningState>() {
           })();
       }
 
-      const _: never = status;
+      const _exhaustiveCheck: never = status;
+      return _exhaustiveCheck;
     },
     listen: ps.listen,
   };

@@ -1,4 +1,4 @@
-import { expect, should, test, vi } from "vitest";
+import { expect, test, vi } from "vitest";
 import { pubSub, pubSubRegistry } from "./pub-sub";
 
 // Tests for pubSubRegistry
