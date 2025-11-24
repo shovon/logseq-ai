@@ -17,31 +17,24 @@ const main = async () => {
       type: "string",
       default: "",
       title: "Open AI API Key",
-      description: "We use the OpenAI API for inference and chat completion.",
-    },
-    {
-      key: "embeddingApiKey",
-      type: "string",
-      default: "",
-      title: "Embedding API Key",
       description:
-        "OpenAI API key for generating embeddings (text-embedding-ada-002 model). Used for automatic page indexing.",
+        "OpenAI API key for chat completion and embeddings. Used for AI responses and automatic page indexing.",
     },
   ]);
 
   initializeSidebarStuff();
 
-  // Initialize auto-indexer if embedding API key is configured
+  // Initialize auto-indexer if OpenAI API key is configured
   const settings = logseq.settings;
-  const embeddingApiKey =
-    settings?.embeddingApiKey && typeof settings.embeddingApiKey === "string"
-      ? settings.embeddingApiKey
+  const openAiApiKey =
+    settings?.openAiApiKey && typeof settings.openAiApiKey === "string"
+      ? settings.openAiApiKey
       : "";
-  if (embeddingApiKey !== "") {
+  if (openAiApiKey !== "") {
     try {
       console.log("Initializing embedding auto-indexer...");
       const oramaInstance = await loadVectorDatabase(settings, false);
-      startPageIndexingOnChange(oramaInstance, embeddingApiKey);
+      startPageIndexingOnChange(oramaInstance, openAiApiKey);
       console.log("Embedding auto-indexer initialized successfully");
     } catch (error) {
       console.error("Failed to initialize embedding auto-indexer:", error);
