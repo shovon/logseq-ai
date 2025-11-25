@@ -2,7 +2,12 @@
 // updates the persisted embeddings upon change.
 
 import Bottleneck from "bottleneck";
-import { getEmbeddingDoc, upsert } from "./db";
+import {
+  deleteDebounceSave,
+  getAllIds,
+  getEmbeddingDoc,
+  upsertDebouncedSave,
+} from "./db";
 import { generateEmbedding, HTTPError } from "./embedding";
 import { onRouteChanged } from "../logseq/route-change-service";
 
@@ -77,8 +82,8 @@ async function getOpenApiKey() {
 }
 
 export async function indexAllEmbeddings() {
-  if (isRunning || runningEmbeddings--) {
-    console.log("Indexer already running. Skipping");
+  console.log("Trying to index");
+  if (isRunning || runningEmbeddings > 0) {
     return;
   }
   isRunning = true;
@@ -92,6 +97,8 @@ export async function indexAllEmbeddings() {
     });
   };
 
+  const blockSet = new Set<string>();
+
   const unsubscribeOnChange = logseq.DB.onChanged(lookForGraphSwap);
   const unsubscribeOnOnRouteChanged = onRouteChanged(lookForGraphSwap);
 
@@ -104,7 +111,8 @@ export async function indexAllEmbeddings() {
 
       const blocks = await logseq.Editor.getPageBlocksTree(page.uuid);
 
-      for (const block of blocks) {
+      for (const block of blocks ?? []) {
+        blockSet.add(block.uuid);
         if (abortController.signal.aborted) return;
         const inputText =
           typeof block.content === "string" ? block.content.trim() : "";
@@ -128,8 +136,7 @@ export async function indexAllEmbeddings() {
               }),
               computeChecksum(inputText),
             ]);
-
-            await upsert({
+            await upsertDebouncedSave({
               id: block.uuid,
               embedding,
               checksum,
@@ -145,4 +152,11 @@ export async function indexAllEmbeddings() {
     unsubscribeOnChange();
     unsubscribeOnOnRouteChanged();
   }
+
+  // const allIds = await getAllIds();
+  // for (const id of allIds) {
+  //   if (!blockSet.has(id)) {
+  //     deleteDebounceSave(id);
+  //   }
+  // }
 }

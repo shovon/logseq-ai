@@ -261,7 +261,6 @@ Note: The user asked about the page "${intent.pageName}", but it could not be fo
           const pageName =
             block.page?.originalName ||
             block.page?.name ||
-            block.page?.uuid ||
             String(block.page?.id || "Unknown Page");
 
           if (!resultsByPage.has(pageName)) {
