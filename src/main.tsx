@@ -6,6 +6,17 @@ import App from "./App/App.tsx";
 import { onReady } from "./services/logseq/ready-service.ts";
 import { initializeSidebarStuff } from "./sidebar-stuff.ts";
 import { indexAllEmbeddings } from "./services/embedding/indexer.ts";
+import { onRouteChanged } from "./services/logseq/route-change-service.ts";
+
+function debounce(callback: () => unknown, delay: number) {
+  let timer: ReturnType<typeof setTimeout>;
+  return function () {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      callback();
+    }, delay);
+  };
+}
 
 const main = async () => {
   logseq.useSettingsSchema([
@@ -21,9 +32,15 @@ const main = async () => {
 
   initializeSidebarStuff();
 
-  // logseq.DB.onChanged(() => {
-  //   indexAllEmbeddings();
-  // });
+  const debouncedIndex = debounce(indexAllEmbeddings, 1000);
+
+  const debouncedIndexing = () => {
+    debouncedIndex();
+  };
+
+  logseq.DB.onChanged(debouncedIndexing);
+  onRouteChanged(debouncedIndexing);
+
   indexAllEmbeddings();
 };
 
