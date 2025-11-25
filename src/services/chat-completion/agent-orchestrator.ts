@@ -16,6 +16,7 @@ const IntentSchema = z.object({
     "analyze_current_page",
     "general_query",
     "analyze_specific_page",
+    "create_new_page",
   ]),
   reasoning: z
     .string()
@@ -57,6 +58,7 @@ Determine if the user wants to:
 1. "analyze_current_page" - They want to analyze or get information about the page they're currently viewing (e.g., "take a look at the current page", "what's this page about", "analyze this page", "tell me about this page")
 2. "analyze_specific_page" - They want to analyze a specific page mentioned by name (e.g., "tell me about [[Project X]]", "what's in the [[Notes]] page")
 3. "general_query" - A general question that doesn't require page analysis
+4. "create_new_page" - User is requesting to create a new page
 
 Be liberal in detecting "analyze_current_page" - if the user mentions "current page", "this page", "the page", or asks what something is about without specifying a page, assume they mean the current page.`,
   });
@@ -162,6 +164,7 @@ export async function getPageByName(pageName: string): Promise<{
 export async function buildEnhancedMessage(originalMessage: string): Promise<{
   enhancedMessage: string;
   contextAdded: boolean;
+  shouldCreatePage: boolean;
 }> {
   // Detect intent
   const intent = await detectIntent(originalMessage);
@@ -298,5 +301,9 @@ Note: The user asked about the page "${intent.pageName}", but it could not be fo
     // Continue without vector context if it fails
   }
 
-  return { enhancedMessage, contextAdded };
+  return {
+    enhancedMessage,
+    contextAdded,
+    shouldCreatePage: intent.intent === "create_new_page",
+  };
 }
