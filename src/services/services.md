@@ -2,6 +2,6 @@
 
 This is the place where we have all our services.
 
-Services don't need to maintain state, but it _must_ yield side effects.
+Services don't need to maintain state, but they _must_ yield side effects.
 
 At the time of writing this, even a GET request is a side effect, because it is invoking a third-party service via HTTP, which is beyond the scope of _necessary_ side effects to maintain atomic, idempotent, effectless black-box invocations.

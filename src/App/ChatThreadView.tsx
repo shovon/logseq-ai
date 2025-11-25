@@ -72,8 +72,6 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
   const handleSendMessage = async (value: string) => {
     const currentInput = transformDashBulletPointsToStars(value);
 
-    console.log(currentInput);
-
     try {
       // Build prior messages BEFORE appending the new message
       // Filter out the last user message if it matches currentInput (safety check)
@@ -82,8 +80,6 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
         role: m.message.role,
         content: m.message.content,
       }));
-
-      console.log("Appending message to thread");
 
       // Append user message block
       await appendMessageToThread(pageId, {

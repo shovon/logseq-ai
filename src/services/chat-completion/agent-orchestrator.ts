@@ -4,6 +4,9 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { buildPageContext } from "./context-builder";
+import { generateEmbedding } from "../embedding/embedding";
+import { vectorSearch } from "../embedding/db";
+import { filterPropertyLines } from "../../utils/utils";
 
 /**
  * Detects user intent from their message
@@ -206,6 +209,94 @@ Please analyze the page content and provide a helpful response to the user's que
 
 Note: The user asked about the page "${intent.pageName}", but it could not be found or has no content.`;
     }
+  }
+
+  // Always-on vector retrieval - retrieve relevant blocks from all notes
+  try {
+    const apiKeyValue = logseq.settings?.openAiApiKey;
+
+    if (
+      typeof apiKeyValue === "string" &&
+      apiKeyValue.trim() !== "" &&
+      apiKeyValue !== "sk-proj-1234"
+    ) {
+      // Generate embedding for the user's message
+      const queryEmbedding = await generateEmbedding({
+        inputText: originalMessage,
+        apiKey: apiKeyValue,
+      });
+
+      // Search vector database for relevant blocks
+      const searchResults = await vectorSearch(queryEmbedding);
+
+      if (searchResults.hits && searchResults.hits.length > 0) {
+        // Group results by page for better formatting
+        const resultsByPage = new Map<
+          string,
+          Array<{ content: string; score: number }>
+        >();
+
+        for (const hit of searchResults.hits) {
+          const doc = hit.document;
+          const blockId =
+            typeof doc.id === "string" ? doc.id.trim() : undefined;
+
+          if (!blockId) {
+            continue;
+          }
+
+          const block = await logseq.Editor.getBlock(blockId);
+          const rawContent =
+            typeof block?.content === "string" ? block.content.trim() : "";
+
+          if (!block || !rawContent) {
+            continue;
+          }
+
+          const content = filterPropertyLines(rawContent).trim();
+          if (!content) {
+            continue;
+          }
+
+          const pageName =
+            block.page?.originalName ||
+            block.page?.name ||
+            block.page?.uuid ||
+            String(block.page?.id || "Unknown Page");
+
+          if (!resultsByPage.has(pageName)) {
+            resultsByPage.set(pageName, []);
+          }
+
+          resultsByPage.get(pageName)?.push({
+            content,
+            score: hit.score || 0,
+          });
+        }
+
+        // Format the retrieved context
+        let retrievalContext =
+          "\n\n---\n\n[Relevant context from your notes:]\n\n";
+
+        for (const [pageName, blocks] of resultsByPage.entries()) {
+          retrievalContext += `📄 ${pageName}:\n`;
+          for (const block of blocks) {
+            retrievalContext += `• ${block.content}\n`;
+          }
+          retrievalContext += "\n";
+        }
+
+        retrievalContext +=
+          "[Please use the context above to inform your answer if relevant.]\n";
+
+        // Append retrieval context to enhanced message
+        enhancedMessage = enhancedMessage + retrievalContext;
+        contextAdded = true;
+      }
+    }
+  } catch (error) {
+    console.error("Error during vector retrieval:", error);
+    // Continue without vector context if it fails
   }
 
   return { enhancedMessage, contextAdded };
