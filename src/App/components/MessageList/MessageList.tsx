@@ -56,11 +56,17 @@ const markdownComponents: Components = {
         </a>
       );
     }
-    // Default link behavior for regular links
+    // Default link behavior for regular links - open in external browser
     return (
       <a
         href={href}
         {...remainder}
+        onClick={(e) => {
+          e.preventDefault();
+          if (href) {
+            logseq.App.openExternalLink(href);
+          }
+        }}
         className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium"
       >
         {children}
