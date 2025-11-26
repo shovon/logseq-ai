@@ -7,6 +7,7 @@ import { onReady } from "./services/logseq/ready-service.ts";
 import { initializeSidebarStuff } from "./sidebar-stuff.ts";
 import { indexAllEmbeddings } from "./services/embedding/indexer.ts";
 import { onRouteChanged } from "./services/logseq/route-change-service.ts";
+import { loadMCPServers } from "./services/chat-completion/mcp.ts";
 
 function debounce(callback: () => unknown, delay: number) {
   let timer: ReturnType<typeof setTimeout>;
@@ -42,6 +43,8 @@ const main = async () => {
   onRouteChanged(debouncedIndexing);
 
   indexAllEmbeddings();
+
+  console.log(loadMCPServers());
 };
 
 onReady(main);
