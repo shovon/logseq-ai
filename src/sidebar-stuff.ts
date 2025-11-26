@@ -232,7 +232,10 @@ const handleParentWindowMouseDown = (event: MouseEvent) => {
 
   lastMousePosition = event.clientX;
 
-  const viewportWidth = window.parent.innerWidth;
+  const viewportWidth = window.parent?.innerWidth;
+  if (viewportWidth === undefined) {
+    return;
+  }
   const sidebarWidth = getSidebarWidth();
   const sidebarLeftEdgeLeftBoundary =
     viewportWidth - sidebarWidth - sidebarHandleWidth;
@@ -272,6 +275,10 @@ let hasRegisteredParentMouseDownListener = false;
 
 const registerParentWindowListeners = () => {
   if (hasRegisteredParentMouseDownListener) {
+    return;
+  }
+
+  if (!window.parent) {
     return;
   }
 
