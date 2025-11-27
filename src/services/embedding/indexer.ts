@@ -2,12 +2,7 @@
 // updates the persisted embeddings upon change.
 
 import Bottleneck from "bottleneck";
-import {
-  deleteDebounceSave,
-  getAllIds,
-  getEmbeddingDoc,
-  upsertDebouncedSave,
-} from "./db";
+import { getEmbeddingDoc, upsertDebouncedSave } from "./db";
 import { generateEmbedding, HTTPError } from "./embedding";
 import { onRouteChanged } from "../logseq/route-change-service";
 
