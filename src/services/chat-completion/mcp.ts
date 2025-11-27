@@ -20,7 +20,6 @@ export function loadMCPServers(): MCPServerConfig[] {
     const data = result.data;
     return Object.entries(data)
       .map(([, obj]) => {
-        console.log(obj);
         try {
           return MCPServerConfig.parse(obj);
         } catch {

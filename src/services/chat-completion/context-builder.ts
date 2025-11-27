@@ -67,7 +67,7 @@ export async function buildReferencedPagesContext(
           .flat(),
       });
     } catch (error) {
-      console.log(`Error fetching page ${pageName}:`, error);
+      console.error(`Error fetching page ${pageName}:`, error);
     }
   }
 

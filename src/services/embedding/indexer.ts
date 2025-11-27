@@ -82,7 +82,6 @@ async function getOpenApiKey() {
 }
 
 export async function indexAllEmbeddings() {
-  console.log("Trying to index");
   if (isRunning || runningEmbeddings > 0) {
     return;
   }

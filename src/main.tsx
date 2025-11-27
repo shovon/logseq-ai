@@ -44,7 +44,7 @@ const main = async () => {
 
   indexAllEmbeddings();
 
-  console.log(loadMCPServers());
+  loadMCPServers();
 };
 
 onReady(main);

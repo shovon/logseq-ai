@@ -93,7 +93,6 @@ async function newPage(
   prompt: string,
   abortSignal: AbortSignal
 ): Promise<void> {
-  console.log("Creating page");
   const openai = getOpenAIClient();
   const fallbackTitle = buildFallbackTitle(prompt);
 

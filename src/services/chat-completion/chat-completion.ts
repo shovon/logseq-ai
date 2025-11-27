@@ -26,14 +26,11 @@ export async function* runCompletion({
     );
   }
 
-  console.log("Running completion");
-
   const servers = loadMCPServers();
   const clients: Awaited<ReturnType<typeof createMCPClient>>[] = [];
 
   try {
     for (const server of servers) {
-      console.log(server);
       clients.push(await createMCPClient({ transport: server }));
     }
 
@@ -47,8 +44,6 @@ export async function* runCompletion({
     const openai = createOpenAI({
       apiKey: apiKeyValue,
     });
-
-    console.log(tools);
 
     const stream = await streamText({
       stopWhen: stepCountIs(10),
@@ -67,7 +62,6 @@ export async function* runCompletion({
 
     for await (const delta of stream.textStream) {
       if (signal.aborted) return;
-      console.log("Getting delta");
       yield delta;
     }
   } catch (e) {
