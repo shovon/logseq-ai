@@ -115,6 +115,11 @@ export async function indexAllEmbeddings() {
           continue;
         }
 
+        // Skip blocks with content exceeding 100KB (~100K characters)
+        if (inputText.length > 100000) {
+          continue;
+        }
+
         const existingEmbedding = await getEmbeddingDoc(block.uuid);
         const checksum = await computeChecksum(inputText);
         if (existingEmbedding?.checksum === checksum) continue;

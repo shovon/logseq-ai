@@ -29,6 +29,14 @@ const main = async () => {
       description:
         "OpenAI API key for chat completion and embeddings. Used for AI responses and automatic page indexing.",
     },
+    {
+      key: "falApiKey",
+      type: "string",
+      default: "",
+      title: "FAL API Key",
+      description:
+        "FAL API key for image generation. Get your key at https://fal.ai/dashboard/keys",
+    },
   ]);
 
   initializeSidebarStuff();

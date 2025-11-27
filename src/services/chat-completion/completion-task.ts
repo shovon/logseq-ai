@@ -3,7 +3,7 @@ import { generateObject, streamText } from "ai";
 import { z } from "zod";
 import { type Task } from "../../utils/task-runner-repository/task-runner-repository";
 import type { Message } from "../logseq/querier";
-import { runCompletion } from "./chat-completion";
+import { runCompletion, type GeneratedImage } from "./chat-completion";
 import { transformDashBulletPointsToStars } from "../../utils/utils";
 import { from, merge } from "rxjs";
 import type { JobKey, RunningState } from "./task-runner";
@@ -67,9 +67,12 @@ async function* chatThreadMessage(
   messages: Message[],
   abortSignal: AbortSignal
 ): AsyncIterable<RunningState> {
+  const imageResults: GeneratedImage[] = [];
+
   const stream = await runCompletion({
     messages: messages,
-    signal: abortSignal,
+    abortSignal: abortSignal,
+    imageResults,
   });
 
   let content = "role:: assistant\n";
@@ -77,14 +80,37 @@ async function* chatThreadMessage(
   if (!block?.uuid) throw new Error("Failed to append block");
 
   let isStreaming = false;
-  for await (const chunk of stream) {
-    if (!isStreaming) yield { type: "streaming" };
-    isStreaming = true;
+  for await (const part of stream.fullStream) {
     if (abortSignal.aborted) return;
-    content += chunk;
-    await logseq.Editor.updateBlock(
+
+    // Handle text deltas
+    if (part.type === "text-delta") {
+      if (!isStreaming) yield { type: "streaming" };
+      isStreaming = true;
+      content += part.text;
+      await logseq.Editor.updateBlock(
+        block.uuid,
+        transformDashBulletPointsToStars(content)
+      );
+    }
+
+    // Check if any images were generated and dump them
+    while (imageResults.length > 0) {
+      const image = imageResults.shift()!;
+      await logseq.Editor.appendBlockInPage(
+        jobKey,
+        `role:: assistant\n![Generated Image](${image.url})`
+      );
+    }
+  }
+
+  // After streaming is done, check for any remaining images
+  while (imageResults.length > 0) {
+    const image = imageResults.shift()!;
+    await logseq.Editor.insertBlock(
       block.uuid,
-      transformDashBulletPointsToStars(content)
+      `![Generated Image](${image.url})`,
+      { sibling: false }
     );
   }
 }

@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from "react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
@@ -15,6 +15,10 @@ interface MessageListProps {
   completionMachineNode: CompletionMachineNode;
   onEdit?: (blockId: string, newContent: string) => void;
 }
+
+const urlTransform = (url: string) => {
+  return url.startsWith("data:") ? url : defaultUrlTransform(url);
+};
 
 // Shared markdown component configuration for handling Logseq page references
 const markdownComponents: Components = {
@@ -71,6 +75,17 @@ const markdownComponents: Components = {
       >
         {children}
       </a>
+    );
+  },
+  img: ({ node: _, src, alt, ...remainder }) => {
+    // Render images including base64 data URIs
+    return (
+      <img
+        src={src}
+        alt={alt}
+        {...remainder}
+        className="max-w-full h-auto rounded-lg my-4"
+      />
     );
   },
 };
@@ -155,6 +170,7 @@ function UserMessage({ content, blockId, onEdit }: UserMessageProps) {
       )}
       <div className={proseClasses}>
         <ReactMarkdown
+          urlTransform={urlTransform}
           remarkPlugins={[remarkMath, remarkLogseqPageRefs]}
           rehypePlugins={[rehypeKatex]}
           components={markdownComponents}
@@ -175,6 +191,7 @@ function AssistantMessage({ content }: MessageContentProps) {
           remarkPlugins={[remarkMath, remarkLogseqPageRefs]}
           rehypePlugins={[rehypeKatex]}
           components={markdownComponents}
+          urlTransform={urlTransform}
         >
           {filterPropertyLines(content)}
         </ReactMarkdown>

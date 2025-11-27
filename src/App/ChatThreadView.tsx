@@ -54,6 +54,7 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
     () => () => {
       loadThreadMessageBlocks(pageId)
         .then((loadedMessages) => {
+          console.log(loadedMessages);
           setMessages(loadedMessages);
         })
         .catch((error) => {
