@@ -281,7 +281,7 @@ Note: The user asked about the page "${intent.pageName}", but it could not be fo
           "\n\n---\n\n[Relevant context from your notes:]\n\n";
 
         for (const [pageName, blocks] of resultsByPage.entries()) {
-          retrievalContext += `📄 ${pageName}:\n`;
+          retrievalContext += `${pageName}:\n`;
           for (const block of blocks) {
             retrievalContext += `• ${block.content}\n`;
           }

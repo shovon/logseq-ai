@@ -181,9 +181,9 @@ export async function vectorSearch(vector: number[]) {
       value: vector,
       property: "embedding",
     },
-    similarity: 0.65,
+    similarity: 0.6,
     includeVectors: false,
-    limit: 5,
+    limit: 10,
     offset: 0,
   });
 }
