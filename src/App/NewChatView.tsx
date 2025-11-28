@@ -100,8 +100,11 @@ export function NewChatView({ onThreadCreated }: NewChatViewProps) {
 
   return (
     <>
-      <div className="flex-1 overflow-auto p-6">
-        <div className="text-gray-500 text-center">Ask me anything!</div>
+      <div className="flex-1"></div>
+      <div className=" overflow-auto p-6">
+        <div className="text-gray-500 text-center font-bold text-2xl">
+          Ask me anything!
+        </div>
       </div>
       <ChatInput
         className="mt-auto bg-white border-t border-gray-200"
