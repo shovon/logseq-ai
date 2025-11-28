@@ -9,6 +9,7 @@ import type { Components } from "react-markdown";
 import { remarkLogseqPageRefs } from "./remark-logseq-page-refs";
 import { IconPencil } from "@tabler/icons-react";
 import type { CompletionMachineNode } from "../../../services/chat-completion/task-runner";
+import { BeatLoader } from "react-spinners";
 
 interface MessageListProps {
   messages: BlockMessage[];
@@ -200,6 +201,73 @@ function AssistantMessage({ content }: MessageContentProps) {
   );
 }
 
+interface TextCarouselProps {
+  phrases: string[];
+  interval?: number;
+}
+
+function TextCarousel({ phrases, interval = 2000 }: TextCarouselProps) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    if (phrases.length <= 1) return;
+
+    const timer = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % phrases.length);
+    }, interval);
+
+    return () => clearInterval(timer);
+  }, [phrases.length, interval]);
+
+  if (phrases.length === 0) return null;
+  if (phrases.length === 1) {
+    return <div className="text-gray-500 italic">{phrases[0]}</div>;
+  }
+
+  return (
+    <div className="relative h-6 overflow-hidden">
+      {phrases.map((phrase, index) => (
+        <div
+          key={index}
+          className={`absolute inset-0 text-gray-500 italic transition-all duration-500 ease-in-out ${
+            index === currentIndex
+              ? "opacity-100 translate-y-0"
+              : index === (currentIndex - 1 + phrases.length) % phrases.length
+                ? "opacity-0 -translate-y-2"
+                : "opacity-0 translate-y-2"
+          }`}
+        >
+          {phrase}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Thinking indicator component for showing temporary "thinking" state
+function ThinkingIndicator() {
+  return (
+    <div className="rounded-lg flex">
+      <div className="mr-1">
+        <BeatLoader color="#6b7280" size={8} />
+      </div>
+      <div className="flex-1">
+        <TextCarousel
+          phrases={[
+            "Calculating",
+            "Contemplating",
+            "Cooking things up",
+            "Twiddling my thumbs",
+            "Fidgetting",
+            "Thinking",
+            "Philosophising",
+          ]}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function MessageList({
   messages,
   completionMachineNode,
@@ -293,9 +361,7 @@ export function MessageList({
         )
       )}
       {completionMachineNode.type === "running" &&
-        !completionMachineNode.data && (
-          <AssistantMessage content="Thinking..." />
-        )}
+        !completionMachineNode.data && <ThinkingIndicator />}
     </div>
   );
 }
