@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
@@ -208,31 +208,36 @@ interface TextCarouselProps {
 
 function TextCarousel({ phrases, interval = 2000 }: TextCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [randomizedPhrases] = useState(() => {
+    return [...phrases].sort(() => Math.random() - 0.5);
+  });
 
   useEffect(() => {
-    if (phrases.length <= 1) return;
+    if (randomizedPhrases.length <= 1) return;
 
     const timer = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % phrases.length);
+      setCurrentIndex((prev) => (prev + 1) % randomizedPhrases.length);
     }, interval);
 
     return () => clearInterval(timer);
-  }, [phrases.length, interval]);
+  }, [randomizedPhrases.length, interval]);
 
-  if (phrases.length === 0) return null;
-  if (phrases.length === 1) {
-    return <div className="text-gray-500 italic">{phrases[0]}</div>;
+  if (randomizedPhrases.length === 0) return null;
+  if (randomizedPhrases.length === 1) {
+    return <div className="text-gray-500 italic">{randomizedPhrases[0]}</div>;
   }
 
   return (
     <div className="relative h-6 overflow-hidden">
-      {phrases.map((phrase, index) => (
+      {randomizedPhrases.map((phrase, index) => (
         <div
           key={index}
           className={`absolute inset-0 text-gray-500 italic transition-all duration-500 ease-in-out ${
             index === currentIndex
               ? "opacity-100 translate-y-0"
-              : index === (currentIndex - 1 + phrases.length) % phrases.length
+              : index ===
+                  (currentIndex - 1 + randomizedPhrases.length) %
+                    randomizedPhrases.length
                 ? "opacity-0 -translate-y-2"
                 : "opacity-0 translate-y-2"
           }`}
