@@ -2,6 +2,11 @@
 
 A Logseq plugin that adds AI assistance to enhance your note-taking and knowledge management experience.
 
+## Discussion
+
+- [Thread on Discord about Logseq AI Plugin](https://discord.com/channels/725182569297215569/1442982882196062441)
+- [Discussion forum on GitHub]()
+
 ## Overview
 
 This plugin integrates AI capabilities into your Logseq workflow, allowing you to leverage artificial intelligence directly within your knowledge graph.
