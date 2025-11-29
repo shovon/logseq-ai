@@ -1,6 +1,3 @@
-// TODO: this should really be in some "helpers" folder of something of that
-//   sort.
-
 import { z } from "zod";
 import { filterPropertyLines } from "../../utils/utils";
 import type { BlockEntity } from "@logseq/libs/dist/LSPlugin.user";
@@ -43,11 +40,7 @@ const PageType = z
 export type PageType = z.infer<typeof PageType>;
 
 type Role = "user" | "assistant" | "system";
-const Role: z.ZodSchema<Role> = z.union([
-  z.literal("user"),
-  z.literal("assistant"),
-  z.literal("system"),
-]);
+const Role = z.enum(["user", "assistant", "system"]);
 
 export type Message = {
   role: Role;
@@ -100,7 +93,7 @@ export const loadThreadMessageBlocks = async (
   const messages: BlockMessage[] = messageBlocks.map((block) => ({
     block,
     message: {
-      role: block.properties!.role as "user" | "assistant",
+      role: Role.exclude(["system"]).parse(block.properties!.role),
       content: filterPropertyLines(block.content),
     },
   }));
@@ -197,7 +190,8 @@ export const searchPagesByName = async (
   }
 
   // Escape special characters in the search query for use in datascript
-  // Clojure string literals need backslashes, quotes, and control characters escaped
+  // Clojure string literals need backslashes, quotes, and control characters
+  // escaped
   const escapedQuery = searchQuery
     .replace(/\\/g, "\\\\") // Escape backslashes first
     .replace(/"/g, '\\"') // Escape double quotes
