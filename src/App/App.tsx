@@ -77,17 +77,6 @@ function App() {
     }
   };
 
-  // Early return if loading or no API key
-  if (apiKeyLoading || !hasApiKey) {
-    return (
-      <aside className="logseq-ai-plugin text-gray-800 h-screen flex">
-        <section className="bg-white bg-opacity-90 shadow-lg h-full border-l border-gray-200 flex flex-col overflow-hidden flex-1">
-          <ApiKeySetupView onApiKeySaved={handleApiKeySaved} />
-        </section>
-      </aside>
-    );
-  }
-
   const navigateToNewChat = () => {
     setViewState({ type: "NEW_CHAT" });
   };
@@ -100,16 +89,16 @@ function App() {
     setViewState({ type: "CHAT_THREAD", pageId: threadUuid });
   };
 
-  return (
-    <aside className="logseq-ai-plugin text-gray-800 h-screen flex">
-      <section className="bg-white bg-opacity-90 shadow-lg h-full border-l border-gray-200 flex flex-col overflow-hidden flex-1">
+  const Main = () => {
+    const baseButtonClass =
+      "flex px-3 py-2 text-sm font-medium rounded-lg text-gray-700 dark:text-logseq-cyan-low-saturation-300 hover:bg-gray-200 dark:hover:bg-logseq-cyan-low-saturation-800/70 cursor-pointer";
+
+    return (
+      <>
         {/* Navigation Header */}
-        <div className="flex py-2 px-3 border-b border-gray-100">
+        <div className="flex py-2 px-3 border-b border-gray-100 dark:border-logseq-cyan-low-saturation-800/70">
           {viewState.type !== "CHAT_HISTORY" && (
-            <button
-              onClick={navigateToHistory}
-              className="flex px-3 py-2 text-sm font-medium rounded-lg text-gray-700 hover:bg-gray-200"
-            >
+            <button onClick={navigateToHistory} className={baseButtonClass}>
               <div className="mt-0.5 mr-2">
                 <IconHistory size={16} />
               </div>
@@ -120,10 +109,7 @@ function App() {
           <div className="flex-1"></div>
 
           {viewState.type !== "NEW_CHAT" && (
-            <button
-              onClick={navigateToNewChat}
-              className={`flex px-3 py-2 text-sm font-medium rounded-lg text-gray-700 hover:bg-gray-200`}
-            >
+            <button onClick={navigateToNewChat} className={baseButtonClass}>
               <div className="mt-0.5 mr-2">
                 <IconEdit size={16} />
               </div>{" "}
@@ -139,6 +125,18 @@ function App() {
           <NewChatView onThreadCreated={navigateToThread} />
         ) : (
           <ChatThreadView pageId={viewState.pageId} />
+        )}
+      </>
+    );
+  };
+
+  return (
+    <aside className="logseq-ai-plugin text-gray-800 dark:text-logseq-cyan-low-saturation-100 h-screen flex">
+      <section className="bg-white dark:bg-logseq-cyan-low-saturation-950 shadow-lg h-full border-l border-gray-200 dark:border-logseq-cyan-low-saturation-800/70 flex flex-col overflow-hidden flex-1">
+        {apiKeyLoading || !hasApiKey ? (
+          <ApiKeySetupView onApiKeySaved={handleApiKeySaved} />
+        ) : (
+          <Main />
         )}
       </section>
     </aside>
