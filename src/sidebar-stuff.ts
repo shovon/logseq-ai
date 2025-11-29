@@ -21,6 +21,7 @@ const applicationId = packageJson.logseq.id;
 const sidebarWidthStorageKey = `${applicationId}-logseq-ai-plugin.sidebar-width`;
 
 const defaultWidth = 400;
+const MIN_WIDTH = 300;
 
 const sidebarHandleWidth = 4;
 const spacerLeftPadding = 10;
@@ -36,6 +37,8 @@ let lastMousePosition = 0;
 
 // Sidebar width ---------------------------------------------------------------
 
+const clampWidth = (width: number) => Math.max(MIN_WIDTH, width);
+
 const getSidebarWidth = () => {
   if (isNaN(sidebarWidth)) {
     sidebarWidth = readStoredWidth();
@@ -44,8 +47,8 @@ const getSidebarWidth = () => {
 };
 
 const setSidebarWidth = (width: number) => {
-  sidebarWidth = width;
-  persistWidth(width);
+  sidebarWidth = clampWidth(width);
+  persistWidth(sidebarWidth);
 };
 
 // Element ID ------------------------------------------------------------------
@@ -253,10 +256,17 @@ const handleParentWindowMouseMove = (event: MouseEvent) => {
   }
 
   const currentMousePosition = event.clientX;
-  const nextWidth =
-    getSidebarWidth() - (currentMousePosition - lastMousePosition);
-  lastMousePosition = currentMousePosition;
+  const nextWidth = Math.max(
+    MIN_WIDTH,
+    getSidebarWidth() - (currentMousePosition - lastMousePosition)
+  );
 
+  if (nextWidth > MIN_WIDTH) {
+    lastMousePosition = currentMousePosition;
+  }
+
+  const previousWidth = getSidebarWidth();
+  if (nextWidth === previousWidth) return;
   setSidebarWidth(nextWidth);
 
   const appliedWidth = getSidebarWidth();
@@ -367,7 +377,7 @@ const readStoredWidth = () => {
     }
 
     const parsed = Number.parseInt(raw, 10);
-    return Number.isFinite(parsed) ? parsed : defaultWidth;
+    return Number.isFinite(parsed) ? clampWidth(parsed) : defaultWidth;
   } catch {
     return defaultWidth;
   }

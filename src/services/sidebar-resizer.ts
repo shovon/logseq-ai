@@ -1,5 +1,5 @@
 const DEFAULT_WIDTH = 400;
-const MIN_WIDTH = 320;
+export const MIN_WIDTH = 300;
 const MAX_WIDTH = 640;
 export const SIDEBAR_HANDLE_WIDTH = 2;
 const STORAGE_KEY = "logseq-ai-plugin.sidebar-width";
@@ -100,7 +100,7 @@ export const getInjectedContainerTemplate = () => {
 };
 
 export const setSidebarWidth = (width: number, options?: WidthOptions) => {
-  applySidebarWidth(width, options);
+  applySidebarWidth(clampWidth(width), options);
 };
 
 export const startSidebarResize = (
