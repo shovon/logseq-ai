@@ -127,9 +127,12 @@ function UserMessage({ content, blockId, onEdit }: UserMessageProps) {
     setIsEditing(false);
   };
 
+  const baseClass =
+    "rounded-lg px-3 py-2 bg-blue-50 dark:bg-logseq-cyan-low-saturation-800/30 ml-8";
+
   if (isEditing) {
     return (
-      <div className="rounded-lg px-3 py-2 bg-blue-50 ml-8">
+      <div className={`${baseClass}`}>
         <textarea
           value={editedContent}
           onChange={(e) => setEditedContent(e.target.value)}
@@ -156,7 +159,7 @@ function UserMessage({ content, blockId, onEdit }: UserMessageProps) {
 
   return (
     <div
-      className="rounded-lg px-3 py-2 bg-blue-50 ml-8 relative group"
+      className={`${baseClass} relative group`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -232,7 +235,7 @@ function TextCarousel({ phrases, interval = 2000 }: TextCarouselProps) {
       {randomizedPhrases.map((phrase, index) => (
         <div
           key={index}
-          className={`absolute inset-0 text-gray-500 italic transition-all duration-500 ease-in-out ${
+          className={`absolute inset-0 text-gray-500 dark:text-logseq-cyan-low-saturation-300 italic transition-all duration-500 ease-in-out ${
             index === currentIndex
               ? "opacity-100 translate-y-0"
               : index ===

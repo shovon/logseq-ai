@@ -375,7 +375,7 @@ export function ChatInput({
         }}
         onKeyDown={handleKeyPress}
         placeholder="Type your message here..."
-        className="w-full rounded-xl flex-1 resize-none border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none block pt-4 px-6"
+        className="w-full flex-1 resize-none border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none block pt-4 px-6"
         rows={1}
         disabled={disabled}
         style={{
@@ -398,7 +398,7 @@ export function ChatInput({
             }
           }}
           disabled={isButtonDisabled}
-          className="block px-3 py-1.5 text-gray-700 rounded-lg text-sm font-bold cursor-pointer"
+          className="block px-3 py-1.5 text-gray-700 dark:text-logseq-cyan-low-saturation-300 rounded-lg text-sm font-bold cursor-pointer"
           style={{
             opacity: isButtonDisabled ? 0 : 1,
           }}

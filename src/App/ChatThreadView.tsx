@@ -54,7 +54,6 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
     () => () => {
       loadThreadMessageBlocks(pageId)
         .then((loadedMessages) => {
-          console.log(loadedMessages);
           setMessages(loadedMessages);
         })
         .catch((error) => {
@@ -144,7 +143,7 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
         onEdit={handleEditMessage}
       />
       <ChatInput
-        className="mt-auto bg-white border-t border-gray-200"
+        className="mt-auto bg-white dark:bg-logseq-cyan-low-saturation-900 border-t border-gray-200 dark:border-logseq-cyan-low-saturation-800"
         onSend={handleSendMessage}
         disabled={jobActive}
         isRunning={jobActive}

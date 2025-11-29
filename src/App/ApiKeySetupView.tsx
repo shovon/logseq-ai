@@ -57,10 +57,10 @@ export function ApiKeySetupView({ onApiKeySaved }: ApiKeySetupViewProps) {
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-md mx-auto">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4 dark:text-logseq-cyan-low-saturation-400">
             OpenAI API Key Required
           </h2>
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-600 dark:text-logseq-cyan-low-saturation-300 mb-6">
             To use this plugin, you need to provide your OpenAI API key. You can
             get an API key from{" "}
             <a
@@ -77,7 +77,7 @@ export function ApiKeySetupView({ onApiKeySaved }: ApiKeySetupViewProps) {
           <div className="mb-4">
             <label
               htmlFor="api-key-input"
-              className="block text-sm font-medium text-gray-700 mb-2"
+              className="block text-sm font-medium text-gray-700 dark:text-logseq-cyan-low-saturation-400 mb-2"
             >
               OpenAI API Key
             </label>
