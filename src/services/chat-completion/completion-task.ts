@@ -78,50 +78,72 @@ async function* chatThreadMessage(
   messages: Message[],
   abortSignal: AbortSignal
 ): AsyncIterable<RunningState> {
-  const imageResults: GeneratedImage[] = [];
+  try {
+    const imageResults: GeneratedImage[] = [];
 
-  const stream = await runCompletion({
-    messages: messages,
-    abortSignal: abortSignal,
-    imageResults,
-  });
+    try {
+      const stream = await runCompletion({
+        messages: messages,
+        abortSignal: abortSignal,
+        imageResults,
+      });
 
-  let content = "role:: assistant\n";
-  const block = await logseq.Editor.appendBlockInPage(jobKey, content);
-  if (!block?.uuid) throw new Error("Failed to append block");
+      const properties = "role:: assistant";
+      let content = "";
+      const block = await logseq.Editor.appendBlockInPage(jobKey, content);
+      if (!block?.uuid) throw new Error("Failed to append block");
 
-  let isStreaming = false;
-  for await (const part of stream.fullStream) {
-    if (abortSignal.aborted) return;
+      try {
+        let isStreaming = false;
+        for await (const part of stream.fullStream) {
+          if (abortSignal.aborted) return;
 
-    // Handle text deltas
-    if (part.type === "text-delta") {
-      if (!isStreaming) yield { type: "streaming" };
-      isStreaming = true;
-      content += part.text;
-      await logseq.Editor.updateBlock(
-        block.uuid,
-        transformDashBulletPointsToStars(content)
-      );
-    }
+          // Handle text deltas
+          if (part.type === "text-delta") {
+            if (!isStreaming) yield { type: "streaming" };
+            isStreaming = true;
+            content += part.text;
+            await logseq.Editor.updateBlock(
+              block.uuid,
+              `${properties}\n{transformDashBulletPointsToStars(content)}`
+            );
+          }
 
-    // Check if any images were generated and dump them
-    while (imageResults.length > 0) {
-      const image = imageResults.shift()!;
+          // Check if any images were generated and dump them
+          while (imageResults.length > 0) {
+            const image = imageResults.shift()!;
+            await logseq.Editor.appendBlockInPage(
+              jobKey,
+              `role:: assistant\n![Generated Image](${image.url})`
+            );
+          }
+        }
+      } catch {
+        // TODO: update the block to indicate that something failed.
+        await logseq.Editor.updateBlock(
+          block.uuid,
+          `${properties}\nstatus:: failed\n${content}`
+        );
+      }
+
+      // After streaming is done, check for any remaining images
+      while (imageResults.length > 0) {
+        const image = imageResults.shift()!;
+        await logseq.Editor.appendBlockInPage(
+          jobKey,
+          `![Generated Image](${image.url})`
+        );
+      }
+    } catch {
       await logseq.Editor.appendBlockInPage(
         jobKey,
-        `role:: assistant\n![Generated Image](${image.url})`
+        `role:: assistant\nstatus:: failed!`
       );
     }
-  }
-
-  // After streaming is done, check for any remaining images
-  while (imageResults.length > 0) {
-    const image = imageResults.shift()!;
-    await logseq.Editor.insertBlock(
-      block.uuid,
-      `![Generated Image](${image.url})`,
-      { sibling: false }
+  } catch {
+    await logseq.Editor.appendBlockInPage(
+      jobKey,
+      `role:: assistant\nstatus:: failed!`
     );
   }
 }

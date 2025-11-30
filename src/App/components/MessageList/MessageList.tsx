@@ -5,9 +5,10 @@ import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { filterPropertyLines } from "../../../utils/utils";
 import type { BlockMessage } from "../../../services/logseq/querier";
+import type { BlockEntity } from "@logseq/libs/dist/LSPlugin.user";
 import type { Components } from "react-markdown";
 import { remarkLogseqPageRefs } from "./remark-logseq-page-refs";
-import { IconPencil } from "@tabler/icons-react";
+import { IconPencil, IconAlertTriangle } from "@tabler/icons-react";
 import type { CompletionMachineNode } from "../../../services/chat-completion/task-runner";
 import { BeatLoader } from "react-spinners";
 
@@ -99,6 +100,10 @@ interface MessageContentProps {
   content: string;
 }
 
+interface AssistantMessageProps extends MessageContentProps {
+  block: BlockEntity;
+}
+
 interface UserMessageProps extends MessageContentProps {
   blockId: string;
   onEdit: (blockId: string, newContent: string) => void;
@@ -187,7 +192,9 @@ function UserMessage({ content, blockId, onEdit }: UserMessageProps) {
 }
 
 // Assistant message component for assistant responses
-function AssistantMessage({ content }: MessageContentProps) {
+function AssistantMessage({ content, block }: AssistantMessageProps) {
+  const isFailed = block.properties?.status === "failed";
+
   return (
     <div className="rounded-lg">
       <div className={proseClasses}>
@@ -200,6 +207,14 @@ function AssistantMessage({ content }: MessageContentProps) {
           {filterPropertyLines(content)}
         </ReactMarkdown>
       </div>
+      {isFailed && (
+        <div className="mt-4 pt-3 border-t border-yellow-300 dark:border-yellow-600/50 flex items-start gap-2 text-yellow-700 dark:text-yellow-400">
+          <IconAlertTriangle size={20} className="shrink-0 mt-0.5" />
+          <span className="text-sm font-medium">
+            Something went wrong during the completion.
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -365,7 +380,11 @@ export function MessageList({
             onEdit={onEdit || (() => {})}
           />
         ) : (
-          <AssistantMessage key={index} content={message.message.content} />
+          <AssistantMessage
+            key={index}
+            content={message.message.content}
+            block={message.block}
+          />
         )
       )}
       {completionMachineNode.type === "running" &&
