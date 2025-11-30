@@ -1,0 +1,13 @@
+---
+alwaysApply: true
+---
+
+When creating components, please be sure to support dark mode, using Tailwind's `dark` variants.
+
+Additionally, in the folder above `App`, I have defined a custom set of color/hue and shades in the Tailwind themes. We're using Tailwind, so definitely use utility classes that uses the colours defined there for the `dark` variants.
+
+For example:
+
+```
+<span className="text-gray-500 dark:text-logseq-cyan-low-saturation-400"></span>
+```

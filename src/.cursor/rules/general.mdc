@@ -1,0 +1,5 @@
+---
+alwaysApply: true
+---
+
+Any code that yields side-effects and isn't for the main UI behaviour belongs to the `services` folder. Helpers that don't yield side effects typically belong to `utils`. That said, depending on how easy it is to implement, it's better to have a locality bias.

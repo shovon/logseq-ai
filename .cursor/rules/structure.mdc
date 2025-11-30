@@ -1,0 +1,11 @@
+---
+alwaysApply: true
+---
+
+Files are organized by feature; not by functionality.
+
+So there's generally no dedicated `views` folder. It's all just features.
+
+The only time functionality are factored in is when it is shared across different parts of the code (such as services).
+
+For example, if `App.tsx` will rely on a component, but no other component will rely on it, then don't place the component in some `views` folder; just put it in the same `App` folder.
