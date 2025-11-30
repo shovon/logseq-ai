@@ -91,7 +91,7 @@ export function ApiKeySetupView({ onApiKeySaved }: ApiKeySetupViewProps) {
               }}
               onKeyPress={handleKeyPress}
               placeholder="sk-..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-logseq-cyan-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-logseq-cyan-200 focus:border-transparent"
               disabled={isSaving}
               autoFocus
             />
@@ -101,11 +101,7 @@ export function ApiKeySetupView({ onApiKeySaved }: ApiKeySetupViewProps) {
           <button
             onClick={handleSave}
             disabled={isButtonDisabled}
-            className="w-full px-4 py-2 text-white rounded-lg text-sm font-medium disabled:cursor-not-allowed transition-colors"
-            style={{
-              backgroundColor: isButtonDisabled ? "#9ca3af" : "#1e3a8a",
-              opacity: isButtonDisabled ? 0.5 : 1,
-            }}
+            className="w-full px-4 py-2 text-white rounded-lg text-sm font-medium disabled:cursor-not-allowed transition-colors bg-blue-700 dark:bg-logseq-cyan-700  disabled:bg-gray-700 disabled:opacity-50"
           >
             {isSaving ? "Saving..." : "Save API Key"}
           </button>
