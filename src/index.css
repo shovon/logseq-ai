@@ -12,6 +12,7 @@
   --color-logseq-cyan-low-saturation-800: #13414e;
   --color-logseq-cyan-low-saturation-900: #002d38;
   --color-logseq-cyan-low-saturation-950: #07252d;
+  --color-logseq-cyan-low-saturation-980: hsl(192.63, 80.08%, 8%);
 
   --color-logseq-cyan-50: oklch(0.89 0.073 224.15);
   --color-logseq-cyan-100: oklch(0.853 0.102 222.46);
@@ -24,8 +25,4 @@
   --color-logseq-cyan-800: oklch(0.347 0.063 219.45);
   --color-logseq-cyan-900: oklch(0.275 0.05 219.06);
   --color-logseq-cyan-950: oklch(0.248 0.044 217.5);
-}
-
-a {
-  @apply text-blue-600 dark:text-logseq-cyan-300;
 }
