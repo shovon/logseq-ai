@@ -95,22 +95,27 @@ async function* chatThreadMessage(
 
       try {
         let isStreaming = false;
+        let hasRun = false;
         for await (const part of stream.fullStream) {
           if (abortSignal.aborted) return;
 
           // Handle text deltas
           if (part.type === "text-delta") {
+            hasRun = true;
+
             if (!isStreaming) yield { type: "streaming" };
             isStreaming = true;
             content += part.text;
             await logseq.Editor.updateBlock(
               block.uuid,
-              `${properties}\n{transformDashBulletPointsToStars(content)}`
+              `${properties}\n${transformDashBulletPointsToStars(content)}`
             );
           }
 
           // Check if any images were generated and dump them
           while (imageResults.length > 0) {
+            hasRun = true;
+
             const image = imageResults.shift()!;
             await logseq.Editor.appendBlockInPage(
               jobKey,
@@ -118,6 +123,7 @@ async function* chatThreadMessage(
             );
           }
         }
+        if (!hasRun) throw new Error("Failed to generate anything");
       } catch {
         // TODO: update the block to indicate that something failed.
         await logseq.Editor.updateBlock(
