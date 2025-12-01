@@ -286,6 +286,10 @@ const registerParentWindowListeners = () => {
     return;
   }
 
+  if (!window.parent) {
+    return;
+  }
+
   window.parent.addEventListener("mousedown", handleParentWindowMouseDown);
   window.parent.addEventListener("mousemove", handleParentWindowMouseMove);
   window.parent.addEventListener("mouseup", handleParentWindowMouseUp);
