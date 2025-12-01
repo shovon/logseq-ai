@@ -1,4 +1,5 @@
 import { z } from "zod";
+import Fuse from "fuse.js";
 import { filterPropertyLines } from "../../utils/utils";
 import type { BlockEntity } from "@logseq/libs/dist/LSPlugin.user";
 
@@ -204,28 +205,17 @@ export const searchPagesByName = async (
     return [];
   }
 
-  // Escape special characters in the search query for use in datascript
-  // Clojure string literals need backslashes, quotes, and control characters
-  // escaped
-  const escapedQuery = searchQuery
-    .replace(/\\/g, "\\\\") // Escape backslashes first
-    .replace(/"/g, '\\"') // Escape double quotes
-    .replace(/\n/g, "\\n") // Escape newlines
-    .replace(/\r/g, "\\r") // Escape carriage returns
-    .replace(/\t/g, "\\t") // Escape tabs
-    .trim()
-    .toLowerCase();
-
-  const result = await logseq.DB.datascriptQuery(`[:find (pull ?p [*])
-       :where
-       [?p :block/name ?name]
-       [(clojure.string/includes? ?name "${escapedQuery}")]]`);
+  const result = await logseq.DB.datascriptQuery(`
+    [:find (pull ?p [*])
+      :where
+      [?p :block/name _]]
+  `);
 
   const pages = z
     .union([z.array(z.array(z.unknown())), z.null(), z.undefined()])
     .parse(result);
 
-  // Flatten and limit results to 50 for performance
+  // Flatten and coerce to PageType[]
   const allPages = (pages ?? [])
     .flat()
     .map((p) =>
@@ -233,5 +223,16 @@ export const searchPagesByName = async (
     )
     .filter((p): p is PageType => p !== null);
 
-  return allPages;
+  // Use Fuse.js for fuzzy search on name / originalName / content
+  const fuse = new Fuse(allPages, {
+    keys: ["name", "originalName", "content"],
+    includeScore: true,
+    threshold: 0.4,
+    ignoreLocation: true,
+  });
+
+  const results = fuse.search(searchQuery);
+
+  // Map back to PageType[]
+  return results.map((r) => r.item);
 };
