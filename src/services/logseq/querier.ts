@@ -155,8 +155,23 @@ export const deleteAllMessagesAfterBlock = async ({
 export const createChatThreadPage = async (
   firstMessage: string
 ): Promise<string> => {
-  // Use first 64 characters of the message as the page title
-  const pageTitle = firstMessage.substring(0, 64);
+  // Use first 64 characters of the message as the base page title
+  const baseTitle = firstMessage.substring(0, 64);
+
+  // Find a unique title by checking for existing pages and appending a counter if needed
+  let counter = 0;
+  let pageTitle = baseTitle;
+
+  while (true) {
+    const existingPage = await logseq.Editor.getPage(pageTitle);
+    if (!existingPage) {
+      // Page doesn't exist, we can use this title
+      break;
+    }
+    // Page exists, increment counter and try again
+    counter++;
+    pageTitle = `${baseTitle} ${counter}`;
+  }
 
   // Create page with type property
   const page = await logseq.Editor.createPage(
