@@ -73,84 +73,40 @@ function sanitizeTitle(value: string, fallback: string): string {
   return cleaned || fallback;
 }
 
+type TextDeltaEvent = { type: "text-delta"; delta: string };
+type ImageEvent = { type: "image"; image: GeneratedImage };
+type ChatCompletionJobEvent = TextDeltaEvent | ImageEvent;
+
 async function* chatThreadMessage(
-  jobKey: string,
   messages: Message[],
   abortSignal: AbortSignal
-): AsyncIterable<RunningState> {
-  try {
-    const imageResults: GeneratedImage[] = [];
+): AsyncIterable<ChatCompletionJobEvent> {
+  const imageResults: GeneratedImage[] = [];
 
-    try {
-      const stream = await runCompletion({
-        messages: messages,
-        abortSignal: abortSignal,
-        imageResults,
-      });
+  const stream = await runCompletion({
+    messages: messages,
+    abortSignal: abortSignal,
+    imageResults,
+  });
 
-      const properties = "role:: assistant";
-      let content = "";
-      const block = await logseq.Editor.appendBlockInPage(jobKey, content);
-      if (!block?.uuid) throw new Error("Failed to append block");
+  for await (const part of stream.fullStream) {
+    if (abortSignal.aborted) return;
 
-      try {
-        let isStreaming = false;
-        let hasRun = false;
-        for await (const part of stream.fullStream) {
-          if (abortSignal.aborted) return;
-
-          // Handle text deltas
-          if (part.type === "text-delta") {
-            hasRun = true;
-
-            if (!isStreaming) yield { type: "streaming" };
-            isStreaming = true;
-            content += part.text;
-            await logseq.Editor.updateBlock(
-              block.uuid,
-              `${properties}\n${sanitizeMarkdown(content)}`
-            );
-          }
-
-          // Check if any images were generated and dump them
-          while (imageResults.length > 0) {
-            hasRun = true;
-
-            const image = imageResults.shift()!;
-            await logseq.Editor.appendBlockInPage(
-              jobKey,
-              `role:: assistant\n![Generated Image](${image.url})`
-            );
-          }
-        }
-        if (!hasRun) throw new Error("Failed to generate anything");
-      } catch {
-        // TODO: update the block to indicate that something failed.
-        await logseq.Editor.updateBlock(
-          block.uuid,
-          `${properties}\nstatus:: failed\n${content}`
-        );
-      }
-
-      // After streaming is done, check for any remaining images
-      while (imageResults.length > 0) {
-        const image = imageResults.shift()!;
-        await logseq.Editor.appendBlockInPage(
-          jobKey,
-          `![Generated Image](${image.url})`
-        );
-      }
-    } catch {
-      await logseq.Editor.appendBlockInPage(
-        jobKey,
-        `role:: assistant\nstatus:: failed!`
-      );
+    if (part.type === "text-delta") {
+      yield { type: "text-delta", delta: part.text };
     }
-  } catch {
-    await logseq.Editor.appendBlockInPage(
-      jobKey,
-      `role:: assistant\nstatus:: failed!`
-    );
+
+    // Flush any generated images as separate events
+    while (imageResults.length > 0) {
+      const image = imageResults.shift()!;
+      yield { type: "image", image };
+    }
+  }
+
+  // After streaming is done, check for any remaining images
+  while (imageResults.length > 0) {
+    const image = imageResults.shift()!;
+    yield { type: "image", image };
   }
 }
 
@@ -233,7 +189,64 @@ export const simpleCompletion: (
             ...messages,
             { role: "user" as const, content: enhancedMessage },
           ] satisfies Message[];
-          yield* chatThreadMessage(jobKey, m, abortSignal);
+          const properties = "role:: assistant";
+          let content = "";
+          let hasRun = false;
+          let hasSignaledStreaming = false;
+          let block: { uuid: string } | null = null;
+
+          try {
+            for await (const event of chatThreadMessage(m, abortSignal)) {
+              if (abortSignal.aborted) return;
+
+              // First text delta or image signals streaming
+              if (!hasSignaledStreaming) {
+                hasSignaledStreaming = true;
+                yield { type: "streaming" } as RunningState;
+              }
+
+              if (event.type === "text-delta") {
+                hasRun = true;
+
+                if (!block) {
+                  const created = await logseq.Editor.appendBlockInPage(
+                    jobKey,
+                    ""
+                  );
+                  if (!created?.uuid) throw new Error("Failed to append block");
+                  block = created;
+                }
+
+                content += event.delta;
+                await logseq.Editor.updateBlock(
+                  block.uuid,
+                  `${properties}\n${sanitizeMarkdown(content)}`
+                );
+              } else if (event.type === "image") {
+                hasRun = true;
+
+                await logseq.Editor.appendBlockInPage(
+                  jobKey,
+                  `role:: assistant\n![Generated Image](${event.image.url})`
+                );
+              }
+            }
+
+            if (!hasRun) {
+              throw new Error("Failed to generate anything");
+            }
+          } catch {
+            const failureContent =
+              block && content
+                ? `${properties}\nstatus:: failed\n${content}`
+                : `role:: assistant\nstatus:: failed!`;
+
+            if (block?.uuid) {
+              await logseq.Editor.updateBlock(block.uuid, failureContent);
+            } else {
+              await logseq.Editor.appendBlockInPage(jobKey, failureContent);
+            }
+          }
 
           if (shouldCreatePage) {
             await newPage(input, abortSignal);
