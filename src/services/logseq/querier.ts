@@ -236,3 +236,26 @@ export const searchPagesByName = async (
   // Map back to PageType[]
   return results.map((r) => r.item);
 };
+
+/**
+ * Creates a new chat thread with the given user message and starts the completion job.
+ * This encapsulates the full flow of creating a new chat thread.
+ */
+export const createNewChatThread = async (
+  userMessage: string
+): Promise<string> => {
+  // Create thread using first 64 chars of input as title
+  const title = userMessage.slice(0, 64);
+  const pageId = await createChatThreadPage(title);
+  if (!pageId) {
+    throw new Error("Failed to create a new chat thread");
+  }
+
+  // Append user message block
+  await appendMessageToThread(pageId, {
+    role: "user",
+    content: userMessage,
+  } as Message);
+
+  return pageId;
+};

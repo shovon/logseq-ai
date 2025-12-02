@@ -102,13 +102,9 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
     newContent = transformDashBulletPointsToStars(newContent);
 
     try {
-      await logseq.Editor.updateBlock(
-        blockId,
-        transformDashBulletPointsToStars(newContent),
-        {
-          properties: { role: "user" },
-        }
-      );
+      await logseq.Editor.updateBlock(blockId, newContent, {
+        properties: { role: "user" },
+      });
 
       await deleteAllMessagesAfterBlock({ pageId, blockId });
 
@@ -122,12 +118,7 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
       const stateNode =
         completionTaskRunnerRepository.getTaskRunnerStateNode(pageId);
       if (stateNode.type === "idle") {
-        stateNode.run(
-          simpleCompletion(
-            transformDashBulletPointsToStars(newContent),
-            priorMessages
-          )
-        );
+        stateNode.run(simpleCompletion(newContent, priorMessages));
       }
     } catch (e) {
       console.error("Error updating message:", e);
