@@ -13,7 +13,7 @@ import {
 } from "../services/logseq/querier";
 import { completionTaskRunnerRepository } from "../services/chat-completion/task-runner";
 import { simpleCompletion } from "../services/chat-completion/completion-task";
-import { transformDashBulletPointsToStars } from "../utils/utils";
+import { sanitizeMarkdown } from "../utils/utils";
 
 interface ChatThreadViewProps {
   pageId: string;
@@ -70,7 +70,7 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
   }, [loadMessages]);
 
   const handleSendMessage = async (value: string) => {
-    const currentInput = transformDashBulletPointsToStars(value);
+    const currentInput = sanitizeMarkdown(value);
 
     try {
       // Build prior messages BEFORE appending the new message
@@ -99,7 +99,7 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
   };
 
   const handleEditMessage = async (blockId: string, newContent: string) => {
-    newContent = transformDashBulletPointsToStars(newContent);
+    newContent = sanitizeMarkdown(newContent);
 
     try {
       await logseq.Editor.updateBlock(blockId, newContent, {

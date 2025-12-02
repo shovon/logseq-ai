@@ -4,7 +4,7 @@ import { z } from "zod";
 import { type Task } from "../../utils/task-runner-repository/task-runner-repository";
 import type { Message } from "../logseq/querier";
 import { runCompletion, type GeneratedImage } from "./chat-completion";
-import { transformDashBulletPointsToStars } from "../../utils/utils";
+import { sanitizeMarkdown } from "../../utils/utils";
 import { from, merge } from "rxjs";
 import type { JobKey, RunningState } from "./task-runner";
 import { buildEnhancedMessage } from "./agent-orchestrator";
@@ -108,7 +108,7 @@ async function* chatThreadMessage(
             content += part.text;
             await logseq.Editor.updateBlock(
               block.uuid,
-              `${properties}\n${transformDashBulletPointsToStars(content)}`
+              `${properties}\n${sanitizeMarkdown(content)}`
             );
           }
 
@@ -212,10 +212,7 @@ async function newPage(
   for await (const chunk of stream.textStream) {
     if (abortSignal.aborted) return;
     content += chunk;
-    await logseq.Editor.updateBlock(
-      block.uuid,
-      transformDashBulletPointsToStars(content)
-    );
+    await logseq.Editor.updateBlock(block.uuid, sanitizeMarkdown(content));
   }
 }
 

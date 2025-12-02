@@ -1,6 +1,9 @@
 import { z } from "zod";
 import Fuse from "fuse.js";
-import { filterPropertyLines } from "../../utils/utils";
+import {
+  filterPropertyLines,
+  sanitizeMarkdownHeadersToRfcBullets,
+} from "../../utils/utils";
 import type { BlockEntity } from "@logseq/libs/dist/LSPlugin.user";
 
 // Note: this comment on GitHub helped a lot:
@@ -95,7 +98,9 @@ export const loadThreadMessageBlocks = async (
     block,
     message: {
       role: Role.exclude(["system"]).parse(block.properties!.role),
-      content: filterPropertyLines(block.content),
+      content: sanitizeMarkdownHeadersToRfcBullets(
+        filterPropertyLines(block.content)
+      ),
     },
   }));
 

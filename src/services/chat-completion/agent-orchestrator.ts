@@ -6,7 +6,10 @@ import { z } from "zod";
 import { buildPageContext } from "./context-builder";
 import { generateEmbedding } from "../embedding/embedding";
 import { vectorSearch } from "../embedding/db";
-import { filterPropertyLines } from "../../utils/utils";
+import {
+  filterPropertyLines,
+  sanitizeMarkdownHeadersToRfcBullets,
+} from "../../utils/utils";
 
 /**
  * Detects user intent from their message
@@ -256,7 +259,9 @@ Note: The user asked about the page "${intent.pageName}", but it could not be fo
             continue;
           }
 
-          const content = filterPropertyLines(rawContent).trim();
+          const content = sanitizeMarkdownHeadersToRfcBullets(
+            filterPropertyLines(rawContent)
+          ).trim();
           if (!content) {
             continue;
           }

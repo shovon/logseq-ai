@@ -3,7 +3,10 @@ import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
-import { filterPropertyLines } from "../../../utils/utils";
+import {
+  filterPropertyLines,
+  sanitizeMarkdownHeadersToRfcBullets,
+} from "../../../utils/utils";
 import type { BlockMessage } from "../../../services/logseq/querier";
 import type { BlockEntity } from "@logseq/libs/dist/LSPlugin.user";
 import type { Components } from "react-markdown";
@@ -184,7 +187,7 @@ function UserMessage({ content, blockId, onEdit }: UserMessageProps) {
           rehypePlugins={[rehypeKatex]}
           components={markdownComponents}
         >
-          {filterPropertyLines(content)}
+          {sanitizeMarkdownHeadersToRfcBullets(filterPropertyLines(content))}
         </ReactMarkdown>
       </div>
     </div>
@@ -204,7 +207,7 @@ function AssistantMessage({ content, block }: AssistantMessageProps) {
           components={markdownComponents}
           urlTransform={urlTransform}
         >
-          {filterPropertyLines(content)}
+          {sanitizeMarkdownHeadersToRfcBullets(filterPropertyLines(content))}
         </ReactMarkdown>
       </div>
       {isFailed && (

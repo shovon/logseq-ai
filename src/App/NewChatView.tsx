@@ -6,7 +6,7 @@ import {
 } from "../services/logseq/querier";
 import { completionTaskRunnerRepository } from "../services/chat-completion/task-runner";
 import { simpleCompletion } from "../services/chat-completion/completion-task";
-import { transformDashBulletPointsToStars } from "../utils/utils";
+import { sanitizeMarkdown } from "../utils/utils";
 
 interface NewChatViewProps {
   onThreadCreated: (pageId: string) => void;
@@ -18,7 +18,7 @@ export function NewChatView({ onThreadCreated }: NewChatViewProps) {
   const handleSendMessage = async (value: string) => {
     if (isCreating) return;
 
-    const currentInput = transformDashBulletPointsToStars(value);
+    const currentInput = sanitizeMarkdown(value);
     setIsCreating(true);
 
     try {
