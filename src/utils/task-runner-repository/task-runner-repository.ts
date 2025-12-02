@@ -19,7 +19,7 @@ type Running<Status> = {
 };
 
 /**
- * A function that initiates a job, returning an observable which will signal
+ * A function that represents a job, returning an observable which will signal
  * any updates from the job being run.
  */
 export type Task<Key, RunningState> = (options: {
