@@ -5,9 +5,17 @@ import { type Task } from "../../utils/task-runner-repository/task-runner-reposi
 import type { Message } from "../logseq/querier";
 import { runCompletion, type GeneratedImage } from "./chat-completion";
 import { sanitizeMarkdown } from "../../utils/utils";
-import { from, merge } from "rxjs";
+import { from, merge, Observable } from "rxjs";
 import type { JobKey, RunningState } from "./task-runner";
 import { buildEnhancedMessage } from "./agent-orchestrator";
+import { from as fromAsyncIterable } from "ix/asynciterable";
+import { filter, map, share } from "ix/asynciterable/operators";
+import {
+  appendBlockInPageThroughStream,
+  streamToBlock,
+} from "../logseq/stream-to-block";
+import { propsToString } from "../../utils/logseq/logseq";
+import { tee3 } from "../../utils/tee/tee";
 
 const SYSTEM_PROMPT = `You are a helpful AI assistant integrated with Logseq. Help users with their questions and tasks.
 
@@ -172,86 +180,114 @@ async function newPage(
   }
 }
 
+type UnwrapAsyncIterable<A extends AsyncIterable<unknown>> =
+  A extends AsyncIterable<infer T> ? T : never;
+
+// At the time of writing this, it almost feels like `buildEnhancedMessage`
+// is for orchestration and `simpleCompletion` is to write the "main output"
+// to the chat input.
+//
+// The thing is, the concept of a "main output" is kind of… Needs to be fleshed
+// out.
+//
+// But the bottom line is, user prompts -> background tasks are done -> results
+// of the background tasks are dumped into an LLM -> output of LLM is written
+// in assistance box.
+//
+// Gotta think of an architecture around that.
+
 export const simpleCompletion: (
   input: string,
   messages: Message[]
 ) => Task<JobKey, RunningState> =
   (input, messages) =>
   ({ jobKey, abortSignal }) => {
-    return merge(
-      from(
-        (async function* fn() {
-          const { enhancedMessage, shouldCreatePage } =
-            await buildEnhancedMessage(input);
+    return new Observable(function (subscriber) {
+      (async function () {
+        const { enhancedMessage, shouldCreatePage } =
+          await buildEnhancedMessage(input);
 
-          const m = [
-            { role: "system" as const, content: SYSTEM_PROMPT },
-            ...messages,
-            { role: "user" as const, content: enhancedMessage },
-          ] satisfies Message[];
-          const properties = "role:: assistant";
-          let content = "";
-          let hasRun = false;
-          let hasSignaledStreaming = false;
-          let block: { uuid: string } | null = null;
+        const m = [
+          { role: "system" as const, content: SYSTEM_PROMPT },
+          ...messages,
+          { role: "user" as const, content: enhancedMessage },
+        ] satisfies Message[];
 
-          try {
-            for await (const event of chatThreadMessage(m, abortSignal)) {
-              if (abortSignal.aborted) return;
+        const props = {
+          role: "assistant",
+        };
 
-              // First text delta or image signals streaming
-              if (!hasSignaledStreaming) {
-                hasSignaledStreaming = true;
-                yield { type: "streaming" } as RunningState;
-              }
+        const block = await logseq.Editor.appendBlockInPage(
+          jobKey,
+          propsToString(props)
+        );
 
-              if (event.type === "text-delta") {
-                hasRun = true;
+        if (!block) {
+          throw new Error("Something went wrong");
+        }
 
-                if (!block) {
-                  const created = await logseq.Editor.appendBlockInPage(
-                    jobKey,
-                    ""
-                  );
-                  if (!created?.uuid) throw new Error("Failed to append block");
-                  block = created;
-                }
+        let hasRun = false;
 
-                content += event.delta;
-                await logseq.Editor.updateBlock(
-                  block.uuid,
-                  `${properties}\n${sanitizeMarkdown(content)}`
-                );
-              } else if (event.type === "image") {
-                hasRun = true;
+        try {
+          const [t1, t2, t3] = tee3(chatThreadMessage(m, abortSignal));
 
+          const deltaStream = fromAsyncIterable(t1).pipe(
+            filter(
+              (event): event is TextDeltaEvent => event.type === "text-delta"
+            ),
+            map((event) => event.delta),
+            share()
+          );
+
+          const imageStream = fromAsyncIterable(t2).pipe(
+            filter((event): event is ImageEvent => event.type === "image"),
+            map((event) => event.image),
+            share()
+          );
+
+          await Promise.all([
+            streamToBlock(block, deltaStream, {
+              properties: props,
+            }),
+            (async () => {
+              for await (const image of imageStream) {
                 await logseq.Editor.appendBlockInPage(
                   jobKey,
-                  `role:: assistant\n![Generated Image](${event.image.url})`
+                  `role:: assistant\n![Generated Image](${image.url})`
                 );
               }
-            }
+            })(),
+            (async () => {
+              for await (const _ of t3) {
+                subscriber.next({ type: "streaming" });
+                hasRun = true;
+                break;
+              }
+            })(),
+          ]);
 
-            if (!hasRun) {
-              throw new Error("Failed to generate anything");
-            }
-          } catch {
-            const failureContent =
-              block && content
-                ? `${properties}\nstatus:: failed\n${content}`
-                : `role:: assistant\nstatus:: failed!`;
-
-            if (block?.uuid) {
-              await logseq.Editor.updateBlock(block.uuid, failureContent);
-            } else {
-              await logseq.Editor.appendBlockInPage(jobKey, failureContent);
-            }
+          if (!hasRun) {
+            throw new Error("The completion task has not run");
           }
-
-          if (shouldCreatePage) {
-            await newPage(input, abortSignal);
+        } catch {
+          if (block?.uuid) {
+            await logseq.Editor.updateBlock(
+              block.uuid,
+              `${propsToString(props)}\n${block.body}`
+            );
+          } else {
+            await logseq.Editor.appendBlockInPage(
+              jobKey,
+              `role:: assistant\nstatus:: failed!`
+            );
           }
-        })()
-      )
-    );
+        } finally {
+          subscriber.complete();
+        }
+
+        if (shouldCreatePage) {
+          await newPage(input, abortSignal);
+        }
+      })();
+    });
   };
