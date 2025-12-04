@@ -5,15 +5,12 @@ import { type Task } from "../../utils/task-runner-repository/task-runner-reposi
 import type { Message } from "../logseq/querier";
 import { runCompletion, type GeneratedImage } from "./chat-completion";
 import { sanitizeMarkdown } from "../../utils/utils";
-import { from, merge, Observable } from "rxjs";
+import { Observable } from "rxjs";
 import type { JobKey, RunningState } from "./task-runner";
 import { buildEnhancedMessage } from "./agent-orchestrator";
 import { from as fromAsyncIterable } from "ix/asynciterable";
 import { filter, map, share } from "ix/asynciterable/operators";
-import {
-  appendBlockInPageThroughStream,
-  streamToBlock,
-} from "../logseq/stream-to-block";
+import { streamToBlock } from "../logseq/stream-to-block";
 import { propsToString } from "../../utils/logseq/logseq";
 import { tee3 } from "../../utils/tee/tee";
 
@@ -83,7 +80,8 @@ function sanitizeTitle(value: string, fallback: string): string {
 
 type TextDeltaEvent = { type: "text-delta"; delta: string };
 type ImageEvent = { type: "image"; image: GeneratedImage };
-type ChatCompletionJobEvent = TextDeltaEvent | ImageEvent;
+type NothingEvent = { type: "nothing" };
+type ChatCompletionJobEvent = TextDeltaEvent | ImageEvent | NothingEvent;
 
 async function* chatThreadMessage(
   messages: Message[],
@@ -180,9 +178,6 @@ async function newPage(
   }
 }
 
-type UnwrapAsyncIterable<A extends AsyncIterable<unknown>> =
-  A extends AsyncIterable<infer T> ? T : never;
-
 // At the time of writing this, it almost feels like `buildEnhancedMessage`
 // is for orchestration and `simpleCompletion` is to write the "main output"
 // to the chat input.
@@ -196,6 +191,42 @@ type UnwrapAsyncIterable<A extends AsyncIterable<unknown>> =
 //
 // Gotta think of an architecture around that.
 
+async function* completion(
+  input: string,
+  messages: Message[],
+  abortSignal: AbortSignal
+) {
+  const { enhancedMessage, shouldCreatePage } =
+    await buildEnhancedMessage(input);
+
+  const m = [
+    { role: "system" as const, content: SYSTEM_PROMPT },
+    ...messages,
+    { role: "user" as const, content: enhancedMessage },
+  ] satisfies Message[];
+
+  yield* chatThreadMessage(m, abortSignal);
+
+  // TODO: this should really be embedded as a tool.
+  if (shouldCreatePage) {
+    await newPage(input, abortSignal);
+  }
+
+  yield { type: "nothing" };
+}
+
+async function streamInImages(
+  pageId: string,
+  stream: AsyncIterable<GeneratedImage>
+) {
+  for await (const image of stream) {
+    await logseq.Editor.appendBlockInPage(
+      pageId,
+      `role:: assistant\n![Generated Image](${image.url})`
+    );
+  }
+}
+
 export const simpleCompletion: (
   input: string,
   messages: Message[]
@@ -204,15 +235,6 @@ export const simpleCompletion: (
   ({ jobKey, abortSignal }) => {
     return new Observable(function (subscriber) {
       (async function () {
-        const { enhancedMessage, shouldCreatePage } =
-          await buildEnhancedMessage(input);
-
-        const m = [
-          { role: "system" as const, content: SYSTEM_PROMPT },
-          ...messages,
-          { role: "user" as const, content: enhancedMessage },
-        ] satisfies Message[];
-
         const props = {
           role: "assistant",
         };
@@ -229,7 +251,7 @@ export const simpleCompletion: (
         let hasRun = false;
 
         try {
-          const [t1, t2, t3] = tee3(chatThreadMessage(m, abortSignal));
+          const [t1, t2, t3] = tee3(completion(input, messages, abortSignal));
 
           const deltaStream = fromAsyncIterable(t1).pipe(
             filter(
@@ -249,14 +271,7 @@ export const simpleCompletion: (
             streamToBlock(block, deltaStream, {
               properties: props,
             }),
-            (async () => {
-              for await (const image of imageStream) {
-                await logseq.Editor.appendBlockInPage(
-                  jobKey,
-                  `role:: assistant\n![Generated Image](${image.url})`
-                );
-              }
-            })(),
+            streamInImages(jobKey, imageStream),
             (async () => {
               for await (const _ of t3) {
                 subscriber.next({ type: "streaming" });
@@ -283,10 +298,6 @@ export const simpleCompletion: (
           }
         } finally {
           subscriber.complete();
-        }
-
-        if (shouldCreatePage) {
-          await newPage(input, abortSignal);
         }
       })();
     });
