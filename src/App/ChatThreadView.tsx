@@ -47,7 +47,6 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
   const [messages, setMessages] = useState<BlockMessage[]>([]);
   const completionStateNode = useTaskStateMachine(pageId);
 
-  // TODO: is this even necessary?
   const jobActive = completionStateNode.type === "running";
 
   const loadMessages = useMemo(
