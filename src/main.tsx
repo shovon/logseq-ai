@@ -56,10 +56,10 @@ const main = async () => {
   loadMCPServers();
 };
 
-// onReady(main);
+onReady(main);
 
 const rootEl = document.getElementById("root");
 if (rootEl) {
-  // createRoot(rootEl).render(<App />);
-  createRoot(rootEl).render(<Hub />);
+  createRoot(rootEl).render(<App />);
+  // createRoot(rootEl).render(<Hub />);
 }

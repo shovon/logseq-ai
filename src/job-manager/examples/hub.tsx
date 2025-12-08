@@ -55,7 +55,7 @@ export function Hub() {
                           sub.next(state);
                         }
                       },
-                      onStateChange: sub.listen,
+                      onStateChange: (listener) => sub.listen(listener, true),
                     };
                   });
 

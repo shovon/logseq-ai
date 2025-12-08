@@ -55,4 +55,12 @@ export class JobManager<Key, State, Action> {
   get runningJobs(): readonly [Key, Job<State, Action>][] {
     return [...this.jobs.entries()];
   }
+
+  onJobStarted(listener: (key: Key) => void, immediate?: boolean): () => void {
+    return this.jobStartedSubject.listen(listener, immediate);
+  }
+
+  onJobStopped(listener: (key: Key) => void, immediate?: boolean): () => void {
+    return this.jobStoppedSubject.listen(listener, immediate);
+  }
 }
