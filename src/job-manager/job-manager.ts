@@ -18,6 +18,19 @@ export class JobManager<Key, State, Action> {
   private jobStartedSubject = subject<Key>();
   private jobStoppedSubject = subject<Key>();
 
+  /**
+   * Runs a job with the given ID. If a job with the same ID is already running,
+   * this method is idempotent and returns JOB_ALREADY_RUNNING.
+   *
+   * Why does `runJob` accept a function that returns an instance of `Job`, but
+   * not just a `Job` itself? It's because there are setup and teardown logic,
+   * and it's best if `runJob` had the final say when the client-intended job is
+   * to be run.
+   *
+   * @param id - Unique identifier for the job
+   * @param task - Factory function that creates and returns the job to run
+   * @returns Either JOB_CREATED if the job was successfully started, or JOB_ALREADY_RUNNING if a job with this ID already exists
+   */
   runJob(
     id: Key,
     task: () => Job<State, Action>

@@ -4,7 +4,11 @@ import { z } from "zod";
 import type { Message } from "../logseq/querier";
 import { runCompletion, type GeneratedImage } from "./chat-completion";
 import { sanitizeMarkdown, gate } from "../../utils/utils";
-import type { JobKey, CompletionState, CompletionAction } from "./task-runner";
+import type {
+  JobKey,
+  CompletionState,
+  CompletionAction,
+} from "./completion-job-manager";
 import { buildEnhancedMessage } from "./agent-orchestrator";
 import { from as fromAsyncIterable } from "ix/asynciterable";
 import { filter, map, share } from "ix/asynciterable/operators";

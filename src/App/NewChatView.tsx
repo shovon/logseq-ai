@@ -4,7 +4,7 @@ import {
   createNewChatThread,
   searchPagesByName,
 } from "../services/logseq/querier";
-import { completionJobManager } from "../services/chat-completion/task-runner";
+import { completionJobManager } from "../services/chat-completion/completion-job-manager";
 import { simpleCompletion } from "../services/chat-completion/completion-task";
 import { sanitizeMarkdown } from "../utils/utils";
 
