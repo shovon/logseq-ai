@@ -8,6 +8,7 @@ import { initializeSidebarStuff } from "./sidebar-stuff.ts";
 import { indexAllEmbeddings } from "./services/embedding/indexer.ts";
 import { onRouteChanged } from "./services/logseq/route-change-service.ts";
 import { loadMCPServers } from "./services/chat-completion/mcp.ts";
+import { Hub } from "./job-manager/examples/hub.tsx";
 
 function debounce(callback: () => unknown, delay: number) {
   let timer: ReturnType<typeof setTimeout>;
@@ -60,4 +61,5 @@ onReady(main);
 const rootEl = document.getElementById("root");
 if (rootEl) {
   createRoot(rootEl).render(<App />);
+  // createRoot(rootEl).render(<Hub />);
 }
