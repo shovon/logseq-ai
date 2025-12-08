@@ -294,7 +294,7 @@ export const simpleCompletion: (
       if (!hasRun) {
         throw new Error("The completion task has not run");
       }
-    } catch (error) {
+    } catch {
       if (abortController.signal.aborted) {
         // Job was stopped, don't update block
         return;
