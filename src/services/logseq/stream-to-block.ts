@@ -33,8 +33,6 @@ export const streamToBlock = async (
 
   if (!block) return block;
 
-  console.log("Trying to stream");
-
   for await (const segment of stream) {
     console.log("Got character");
     content += segment;

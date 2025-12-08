@@ -12,12 +12,12 @@ import type { BlockEntity } from "@logseq/libs/dist/LSPlugin.user";
 import type { Components } from "react-markdown";
 import { remarkLogseqPageRefs } from "./remark-logseq-page-refs";
 import { IconPencil, IconAlertTriangle } from "@tabler/icons-react";
-import type { CompletionMachineNode } from "../../../services/chat-completion/task-runner";
 import { BeatLoader } from "react-spinners";
 
 interface MessageListProps {
   messages: BlockMessage[];
-  completionMachineNode: CompletionMachineNode;
+  isJobActive: boolean;
+  isStreaming: boolean;
   onEdit?: (blockId: string, newContent: string) => void;
 }
 
@@ -296,12 +296,12 @@ function ThinkingIndicator() {
 
 export function MessageList({
   messages,
-  completionMachineNode,
+  isJobActive,
+  isStreaming,
   onEdit,
 }: MessageListProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isUserAtBottom, setIsUserAtBottom] = useState<boolean>(true);
-  const jobActive = completionMachineNode.type === "running";
 
   // Check if user is scrolled to bottom
   const checkIfAtBottom = () => {
@@ -332,7 +332,7 @@ export function MessageList({
   // Auto-scroll when job status changes
   useEffect(() => {
     scrollToBottom();
-  }, [jobActive, scrollToBottom]);
+  }, [isJobActive, scrollToBottom]);
 
   // Auto-scroll when content changes (e.g., during streaming)
   useEffect(() => {
@@ -371,7 +371,7 @@ export function MessageList({
       onScroll={handleScroll}
       className="flex-1 overflow-auto p-6 pb-4 space-y-4"
     >
-      {messages.length === 0 && !jobActive && (
+      {messages.length === 0 && !isJobActive && (
         <div className="text-gray-500 text-center">Ask me anything!</div>
       )}
       {messages.map((message, index) =>
@@ -390,8 +390,7 @@ export function MessageList({
           />
         )
       )}
-      {completionMachineNode.type === "running" &&
-        !completionMachineNode.data && <ThinkingIndicator />}
+      {isJobActive && !isStreaming && <ThinkingIndicator />}
     </div>
   );
 }

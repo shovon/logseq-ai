@@ -4,7 +4,7 @@ import {
   createNewChatThread,
   searchPagesByName,
 } from "../services/logseq/querier";
-import { completionTaskRunnerRepository } from "../services/chat-completion/task-runner";
+import { completionJobManager } from "../services/chat-completion/task-runner";
 import { simpleCompletion } from "../services/chat-completion/completion-task";
 import { sanitizeMarkdown } from "../utils/utils";
 
@@ -26,11 +26,9 @@ export function NewChatView({ onThreadCreated }: NewChatViewProps) {
       const pageId = await createNewChatThread(currentInput);
 
       // Start completion job for assistant reply (no prior messages for new chat)
-      const stateNode =
-        completionTaskRunnerRepository.getTaskRunnerStateNode(pageId);
-      if (stateNode.type === "idle") {
-        stateNode.run(simpleCompletion(currentInput, []));
-      }
+      completionJobManager.runJob(pageId, () =>
+        simpleCompletion(currentInput, [], pageId)
+      );
 
       // Transition to CHAT_THREAD view
       onThreadCreated(pageId);

@@ -1,21 +1,18 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateObject, streamText } from "ai";
 import { z } from "zod";
-import { type Task } from "../../utils/task-runner-repository/task-runner-repository";
 import type { Message } from "../logseq/querier";
 import { runCompletion, type GeneratedImage } from "./chat-completion";
-import { sanitizeMarkdown } from "../../utils/utils";
-import { from, merge, Observable } from "rxjs";
-import type { JobKey, RunningState } from "./task-runner";
+import { sanitizeMarkdown, gate } from "../../utils/utils";
+import type { JobKey, CompletionState, CompletionAction } from "./task-runner";
 import { buildEnhancedMessage } from "./agent-orchestrator";
 import { from as fromAsyncIterable } from "ix/asynciterable";
 import { filter, map, share } from "ix/asynciterable/operators";
-import {
-  appendBlockInPageThroughStream,
-  streamToBlock,
-} from "../logseq/stream-to-block";
+import { streamToBlock } from "../logseq/stream-to-block";
 import { propsToString } from "../../utils/logseq/logseq";
 import { tee3 } from "../../utils/tee/tee";
+import { subject } from "../../utils/subject/subject";
+import type { Job } from "../../job-manager/job-manager";
 
 const SYSTEM_PROMPT = `You are a helpful AI assistant integrated with Logseq. Help users with their questions and tasks.
 
@@ -83,7 +80,8 @@ function sanitizeTitle(value: string, fallback: string): string {
 
 type TextDeltaEvent = { type: "text-delta"; delta: string };
 type ImageEvent = { type: "image"; image: GeneratedImage };
-type ChatCompletionJobEvent = TextDeltaEvent | ImageEvent;
+type NothingEvent = { type: "nothing" };
+type ChatCompletionJobEvent = TextDeltaEvent | ImageEvent | NothingEvent;
 
 async function* chatThreadMessage(
   messages: Message[],
@@ -180,9 +178,6 @@ async function newPage(
   }
 }
 
-type UnwrapAsyncIterable<A extends AsyncIterable<unknown>> =
-  A extends AsyncIterable<infer T> ? T : never;
-
 // At the time of writing this, it almost feels like `buildEnhancedMessage`
 // is for orchestration and `simpleCompletion` is to write the "main output"
 // to the chat input.
@@ -196,98 +191,149 @@ type UnwrapAsyncIterable<A extends AsyncIterable<unknown>> =
 //
 // Gotta think of an architecture around that.
 
+async function* completion(
+  input: string,
+  messages: Message[],
+  abortSignal: AbortSignal
+) {
+  const { enhancedMessage, shouldCreatePage } =
+    await buildEnhancedMessage(input);
+
+  const m = [
+    { role: "system" as const, content: SYSTEM_PROMPT },
+    ...messages,
+    { role: "user" as const, content: enhancedMessage },
+  ] satisfies Message[];
+
+  yield* chatThreadMessage(m, abortSignal);
+
+  // TODO: this should really be embedded as a tool.
+  if (shouldCreatePage) {
+    await newPage(input, abortSignal);
+  }
+
+  yield { type: "nothing" };
+}
+
+async function streamInImages(
+  pageId: string,
+  stream: AsyncIterable<GeneratedImage>
+) {
+  for await (const image of stream) {
+    await logseq.Editor.appendBlockInPage(
+      pageId,
+      `role:: assistant\n![Generated Image](${image.url})`
+    );
+  }
+}
+
 export const simpleCompletion: (
   input: string,
-  messages: Message[]
-) => Task<JobKey, RunningState> =
-  (input, messages) =>
-  ({ jobKey, abortSignal }) => {
-    return new Observable(function (subscriber) {
-      (async function () {
-        const { enhancedMessage, shouldCreatePage } =
-          await buildEnhancedMessage(input);
+  messages: Message[],
+  jobKey: JobKey
+) => Job<CompletionState, CompletionAction> = (input, messages, jobKey) => {
+  const stopGate = gate();
+  const stateSubject = subject<CompletionState>();
+  let currentState: CompletionState = { type: "starting" };
+  const abortController = new AbortController();
+  let isStopped = false;
 
-        const m = [
-          { role: "system" as const, content: SYSTEM_PROMPT },
-          ...messages,
-          { role: "user" as const, content: enhancedMessage },
-        ] satisfies Message[];
+  // Emit initial starting state
+  stateSubject.next(currentState);
 
-        const props = {
-          role: "assistant",
-        };
+  // Start the async work
+  (async function () {
+    const props = {
+      role: "assistant",
+    };
 
-        const block = await logseq.Editor.appendBlockInPage(
-          jobKey,
-          propsToString(props)
+    const block = await logseq.Editor.appendBlockInPage(
+      jobKey,
+      propsToString(props)
+    );
+
+    if (!block) {
+      throw new Error("Something went wrong");
+    }
+
+    let hasRun = false;
+
+    try {
+      const [t1, t2, t3] = tee3(
+        completion(input, messages, abortController.signal)
+      );
+
+      const deltaStream = fromAsyncIterable(t1).pipe(
+        filter((event): event is TextDeltaEvent => event.type === "text-delta"),
+        map((event) => event.delta),
+        share()
+      );
+
+      const imageStream = fromAsyncIterable(t2).pipe(
+        filter((event): event is ImageEvent => event.type === "image"),
+        map((event) => event.image),
+        share()
+      );
+
+      await Promise.all([
+        streamToBlock(block, deltaStream, {
+          properties: props,
+        }),
+        streamInImages(jobKey, imageStream),
+        (async () => {
+          for await (const _ of t3) {
+            // Update state to streaming when we start processing
+            currentState = { type: "streaming" };
+            stateSubject.next(currentState);
+            hasRun = true;
+            break;
+          }
+        })(),
+      ]);
+
+      if (!hasRun) {
+        throw new Error("The completion task has not run");
+      }
+    } catch {
+      if (abortController.signal.aborted) {
+        // Job was stopped, don't update block
+        return;
+      }
+
+      if (block?.uuid) {
+        await logseq.Editor.updateBlock(
+          block.uuid,
+          `${propsToString(props)}\n${block.body}`
         );
+      } else {
+        await logseq.Editor.appendBlockInPage(
+          jobKey,
+          `role:: assistant\nstatus:: failed!`
+        );
+      }
+    } finally {
+      if (!isStopped) {
+        stopGate.open();
+      }
+    }
+  })();
 
-        if (!block) {
-          throw new Error("Something went wrong");
-        }
-
-        let hasRun = false;
-
-        try {
-          const [t1, t2, t3] = tee3(chatThreadMessage(m, abortSignal));
-
-          const deltaStream = fromAsyncIterable(t1).pipe(
-            filter(
-              (event): event is TextDeltaEvent => event.type === "text-delta"
-            ),
-            map((event) => event.delta),
-            share()
-          );
-
-          const imageStream = fromAsyncIterable(t2).pipe(
-            filter((event): event is ImageEvent => event.type === "image"),
-            map((event) => event.image),
-            share()
-          );
-
-          await Promise.all([
-            streamToBlock(block, deltaStream, {
-              properties: props,
-            }),
-            (async () => {
-              for await (const image of imageStream) {
-                await logseq.Editor.appendBlockInPage(
-                  jobKey,
-                  `role:: assistant\n![Generated Image](${image.url})`
-                );
-              }
-            })(),
-            (async () => {
-              for await (const _ of t3) {
-                subscriber.next({ type: "streaming" });
-                hasRun = true;
-                break;
-              }
-            })(),
-          ]);
-
-          if (!hasRun) {
-            throw new Error("The completion task has not run");
-          }
-        } catch {
-          if (block?.uuid) {
-            await logseq.Editor.updateBlock(
-              block.uuid,
-              `${propsToString(props)}\n${block.body}`
-            );
-          } else {
-            await logseq.Editor.appendBlockInPage(
-              jobKey,
-              `role:: assistant\nstatus:: failed!`
-            );
-          }
-        } finally {
-          subscriber.complete();
-        }
-
-        if (shouldCreatePage) {
-          await newPage(input, abortSignal);
-        }
-      })();
-    });
+  return {
+    get state(): CompletionState {
+      return currentState;
+    },
+    dispatch(_action: CompletionAction) {
+      // No actions needed for now, but interface requires this
+    },
+    onStateChange(listener: (state: CompletionState) => void) {
+      return stateSubject.listen(listener, true);
+    },
+    stop: async () => {
+      if (isStopped) return;
+      isStopped = true;
+      abortController.abort();
+      stopGate.open();
+    },
+    onStopped: stopGate.listen,
   };
+};
