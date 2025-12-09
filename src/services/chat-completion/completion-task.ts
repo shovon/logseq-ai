@@ -195,11 +195,17 @@ async function newPage(
 //
 // Gotta think of an architecture around that.
 
-async function* completion(
+type ChatBot = (
+  input: string,
+  message: Message[],
+  abortSignal: AbortSignal
+) => AsyncIterable<ChatCompletionJobEvent>;
+
+async function* flagshipCompletion(
   input: string,
   messages: Message[],
   abortSignal: AbortSignal
-) {
+): ReturnType<ChatBot> {
   const { enhancedMessage, shouldCreatePage } =
     await buildEnhancedMessage(input);
 
@@ -231,11 +237,13 @@ async function streamInImages(
   }
 }
 
-export const simpleCompletion: (
+export const createCompletionJob: (
   input: string,
   messages: Message[],
   jobKey: JobKey
 ) => Job<CompletionState, CompletionAction> = (input, messages, jobKey) => {
+  // Perhaps this is where we can introduce
+
   const stopGate = gate();
   const stateSubject = subject<CompletionState>();
   let currentState: CompletionState = { type: "starting" };
@@ -264,7 +272,7 @@ export const simpleCompletion: (
 
     try {
       const [t1, t2, t3] = tee3(
-        completion(input, messages, abortController.signal)
+        flagshipCompletion(input, messages, abortController.signal)
       );
 
       const deltaStream = fromAsyncIterable(t1).pipe(
