@@ -5,7 +5,7 @@ import {
   searchPagesByName,
 } from "../services/logseq/querier";
 import { completionJobManager } from "../services/chat-completion/completion-job-manager";
-import { simpleCompletion } from "../services/chat-completion/completion-task";
+import { createCompletionJob } from "../services/chat-completion/completion-task";
 import { sanitizeMarkdown } from "../utils/utils";
 
 interface NewChatViewProps {
@@ -27,7 +27,7 @@ export function NewChatView({ onThreadCreated }: NewChatViewProps) {
 
       // Start completion job for assistant reply (no prior messages for new chat)
       completionJobManager.runJob(pageId, () =>
-        simpleCompletion(currentInput, [], pageId)
+        createCompletionJob(currentInput, [], pageId)
       );
 
       // Transition to CHAT_THREAD view
