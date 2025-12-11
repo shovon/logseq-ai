@@ -1,5 +1,6 @@
 import type { BlockEntity } from "@logseq/libs/dist/LSPlugin.user";
 import { propsToString } from "../../utils/logseq/logseq";
+import { sanitizeMarkdown } from "../../utils/utils";
 
 /**
  * Streams in a block into a page.
@@ -29,13 +30,16 @@ export const streamToBlock = async (
   opts: { properties: Record<string, string> }
 ) => {
   const blockProperties = propsToString(opts.properties);
-  let content = blockProperties;
+  let content = "";
 
   if (!block) return block;
 
   for await (const segment of stream) {
     console.log("Got character");
     content += segment;
-    await logseq.Editor.updateBlock(block?.uuid, content);
+    await logseq.Editor.updateBlock(
+      block?.uuid,
+      `${blockProperties}\n${sanitizeMarkdown(content)}`
+    );
   }
 };

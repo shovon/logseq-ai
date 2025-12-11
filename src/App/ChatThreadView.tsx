@@ -12,7 +12,7 @@ import {
   loadThreadMessageBlocks,
 } from "../services/logseq/querier";
 import { completionJobManager } from "../services/chat-completion/completion-job-manager";
-import { simpleCompletion } from "../services/chat-completion/completion-task";
+import { createCompletionJob } from "../services/chat-completion/completion-task";
 import { sanitizeMarkdown } from "../utils/utils";
 
 interface ChatThreadViewProps {
@@ -145,7 +145,7 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
 
       // Spawn completion job for assistant reply
       completionJobManager.runJob(pageId, () =>
-        simpleCompletion(currentInput, priorMessages, pageId)
+        createCompletionJob(currentInput, priorMessages, pageId)
       );
     } catch (e) {
       logseq.UI.showMsg(`${e ?? ""}`, "error");
@@ -170,7 +170,7 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
 
       // Spawn completion job for assistant reply
       completionJobManager.runJob(pageId, () =>
-        simpleCompletion(newContent, priorMessages, pageId)
+        createCompletionJob(newContent, priorMessages, pageId)
       );
     } catch (e) {
       console.error("Error updating message:", e);
