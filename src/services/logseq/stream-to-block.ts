@@ -27,7 +27,7 @@ export const appendBlockInPageThroughStream = async (
 export const streamToBlock = async (
   block: BlockEntity,
   stream: AsyncIterable<string>,
-  opts: { properties: Record<string, string> }
+  opts: { properties: Record<string, string> } = { properties: {} }
 ) => {
   const blockProperties = propsToString(opts.properties);
   let content = "";
