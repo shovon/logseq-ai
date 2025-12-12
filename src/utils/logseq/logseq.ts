@@ -6,8 +6,8 @@ export const propsToString = (properties: Record<string, string>): string => {
   );
 };
 
-// TODO: unit test this.
-export const blockContent = (
+// TODO: unit test this.s
+export const createBlockContent = (
   properties: Record<string, string>,
   content: string
 ) => `${propsToString(properties)}\n${content}`;
