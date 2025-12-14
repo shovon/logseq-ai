@@ -72,6 +72,7 @@ export function transformDashBulletPointsToStars(markdown: string): string {
   return lines.join("\n");
 }
 
+// TODO: this is very Logseq-specific
 /**
  * Convenience helper that applies all markdown sanitization steps used
  * for user/assistant content before persistence:

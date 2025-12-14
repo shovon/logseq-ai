@@ -5,3 +5,9 @@ export const propsToString = (properties: Record<string, string>): string => {
       .join("\n") + "\n"
   );
 };
+
+// TODO: unit test this.
+export const blockContent = (
+  properties: Record<string, string>,
+  content: string
+) => `${propsToString(properties)}\n${content}`;

@@ -1,0 +1,22 @@
+---
+alwaysApply: true
+---
+
+Any function defined purely to _act on_ an async iterable SHOULD have a type definition roughly of the following:
+
+```typescript
+type ActOn<T> = (...args: unknown) => (it: AsyncIterable<T>) => unknown;
+```
+
+For example.
+
+```typescript
+const map<T, V> = (mapper: (el: T) => V | Promise<V>): AsyncIterable<T> =>
+  async function* map(it: AsyncIterable<T>): AsyncIterable<V> {
+    for await (const el of it) {
+      yield await mapper(el)
+    }
+  };
+```
+
+This is so that we can use some "pipe"-like operator (currently defined as a function).
