@@ -1,4 +1,4 @@
-export const reduce = <T, V>(
+export const scan = <T, V>(
   reducer: (accum: V, next: T) => V | Promise<V>,
   initial: V
 ) =>

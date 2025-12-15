@@ -17,7 +17,7 @@ import type {
 } from "./chat-completion-job-event";
 import { gate, sanitizeMarkdown } from "../../utils/utils";
 import { start as startPipe } from "../../utils/functional/pipe";
-import { reduce } from "../../utils/async-iterables/reduce";
+import { scan } from "../../utils/async-iterables/scan";
 import { forEach } from "../../utils/async-iterables/for-each/for-each";
 import { updateBlock } from "../logseq/helpers";
 import { filter } from "../../utils/async-iterables/filter";
@@ -55,7 +55,7 @@ const streamInText = async (
 ) => {
   await startPipe(events)
     .pipe(map((event) => event.delta))
-    .pipe(reduce((c, el) => c.concat(el), ""))
+    .pipe(scan((c, el) => c.concat(el), ""))
     .pipe(map(sanitizeMarkdown))
     .pipe(map((content) => `${propsToString(props)}\n${content}`))
     .pipe(forEach(updateBlock(block.uuid))).value;
