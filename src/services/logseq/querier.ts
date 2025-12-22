@@ -6,6 +6,8 @@ import {
 } from "../../utils/utils";
 import type { BlockEntity } from "@logseq/libs/dist/LSPlugin.user";
 
+// TODO: quite a lot of this stuff is domain-specific. De domainify things here.
+
 // Note: this comment on GitHub helped a lot:
 // https://github.com/logseq/plugins/issues/30#issuecomment-2926495102
 
