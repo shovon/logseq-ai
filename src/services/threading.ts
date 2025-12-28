@@ -1,4 +1,4 @@
-import { createChatThreadPage, type Message } from "./logseq/querier";
+import { createChatThreadPage, type Message } from "./threading/querier";
 
 // Things to be effective with threads.
 //

@@ -4,7 +4,53 @@ import {
   filterPropertyLines,
   sanitizeMarkdownHeadersToRfcBullets,
 } from "../../utils/utils";
-import type { BlockEntity } from "@logseq/libs/dist/LSPlugin.user";
+import type {
+  BlockEntity,
+  EntityID,
+  BlockUUID,
+  IEntityID,
+  BlockUUIDTuple,
+} from "@logseq/libs/dist/LSPlugin.user";
+
+const EntityID: z.ZodType<EntityID> = z.number();
+const BlockUUID: z.ZodType<BlockUUID> = z.string();
+const IEntityID: z.ZodType<IEntityID> = z
+  .object({
+    id: EntityID,
+  })
+  .catchall(z.any());
+const BlockUUIDTuple = z.tuple([z.literal("uuid"), BlockUUID]);
+
+const BlockEntity: z.ZodType<BlockEntity> = z
+  .object({
+    id: EntityID,
+    uuid: BlockUUID,
+    left: IEntityID,
+    format: z.union([z.literal("markdown"), z.literal("org")]),
+    parent: IEntityID,
+    content: z.string(),
+    page: IEntityID,
+    properties: z.record(z.string(), z.any()).optional(),
+    anchor: z.string().optional(),
+    body: z.any().optional(),
+    children: z
+      .lazy(() => z.array(z.union([BlockEntity, BlockUUIDTuple])))
+      .optional(),
+    container: z.string().optional(),
+    file: IEntityID.optional(),
+    level: z.number().optional(),
+    meta: z
+      .object({
+        timestamps: z.any(),
+        properties: z.any(),
+        startPos: z.number(),
+        endPos: z.number(),
+      })
+      .optional(),
+    title: z.array(z.any()).optional(),
+    marker: z.string().optional(),
+  })
+  .catchall(z.any());
 
 // TODO: quite a lot of this stuff is domain-specific. De domainify things here.
 
@@ -56,6 +102,7 @@ export type Message = {
 export type BlockMessage = {
   message: Message;
   block: BlockEntity;
+  blockReferences: BlockEntity[];
 };
 
 export const getAllChatThreads = async (): Promise<PageType[]> => {
@@ -78,6 +125,34 @@ export const getAllChatThreads = async (): Promise<PageType[]> => {
   });
 };
 
+export const getAllBlockReferences = async (
+  blockId: string
+): Promise<BlockEntity[]> => {
+  // TODO: perhaps try-catch is a bad idea? I don't know. Let's see.
+
+  try {
+    const referencingBlocks = (await logseq.DB.datascriptQuery(
+      `
+      [:find (pull ?b [*])
+        :where
+        [?b :block/refs ?ref]]
+      `
+    )) as unknown;
+
+    // Parse and return the results
+    const blocks = z
+      .union([z.array(z.array(z.unknown())), z.null(), z.undefined()])
+      .parse(referencingBlocks);
+
+    return z
+      .parse(z.array(BlockEntity), (blocks ?? []).flat())
+      .filter((b) => b.content.includes(`((${blockId}))`));
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
+};
+
 export const loadThreadMessageBlocks = async (
   pageUuid: string
 ): Promise<BlockMessage[]> => {
@@ -96,15 +171,26 @@ export const loadThreadMessageBlocks = async (
   );
 
   // Convert blocks to Message objects, preserving order
-  const messages: BlockMessage[] = messageBlocks.map((block) => ({
-    block,
-    message: {
-      role: Role.exclude(["system"]).parse(block.properties!.role),
-      content: sanitizeMarkdownHeadersToRfcBullets(
-        filterPropertyLines(block.content)
-      ),
-    },
-  }));
+  const messages: BlockMessage[] = await Promise.all(
+    messageBlocks.map(async (block) => ({
+      block,
+      message: {
+        role: Role.exclude(["system"]).parse(block.properties!.role),
+        content: sanitizeMarkdownHeadersToRfcBullets(
+          filterPropertyLines(block.content)
+        ),
+      },
+
+      // TODO: perhaps lazily load this instead. Problem with this approach is
+      //   that we risk with having to revalidate stale data somehow (likely
+      //   by adding some listener at the component level).
+      //
+      //   Why lazy-load? It's because we want to have thread messages load up
+      //   much faster; defer the loading of the count until component is
+      //   rendered.
+      blockReferences: await getAllBlockReferences(block.uuid),
+    }))
+  );
 
   return messages;
 };
