@@ -3,7 +3,7 @@ import { ChatInput } from "./components/ChatInput";
 import {
   createNewChatThread,
   searchPagesByName,
-} from "../services/logseq/querier";
+} from "../services/threading/querier";
 import { completionJobManager } from "../services/chat-completion/completion-job-manager";
 import { createCompletionJob } from "../services/chat-completion/completion-task";
 import { sanitizeMarkdown } from "../utils/utils";

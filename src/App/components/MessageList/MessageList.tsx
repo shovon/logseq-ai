@@ -7,7 +7,7 @@ import {
   filterPropertyLines,
   sanitizeMarkdownHeadersToRfcBullets,
 } from "../../../utils/utils";
-import type { BlockMessage } from "../../../services/logseq/querier";
+import type { BlockMessage } from "../../../services/threading/querier";
 import type { BlockEntity } from "@logseq/libs/dist/LSPlugin.user";
 import type { Components } from "react-markdown";
 import { remarkLogseqPageRefs } from "./remark-logseq-page-refs";
@@ -105,15 +105,19 @@ interface MessageContentProps {
 
 interface AssistantMessageProps extends MessageContentProps {
   block: BlockEntity;
+
+  // TODO: move this to `MessageContentProps`
+  refCount: number;
 }
 
 interface UserMessageProps extends MessageContentProps {
   blockId: string;
   onEdit: (blockId: string, newContent: string) => void;
+  refCount: number;
 }
 
 // User message component for user prompts
-function UserMessage({ content, blockId, onEdit }: UserMessageProps) {
+function UserMessage({ content, blockId, onEdit, refCount }: UserMessageProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(content);
   const [isHovered, setIsHovered] = useState(false);
@@ -166,55 +170,73 @@ function UserMessage({ content, blockId, onEdit }: UserMessageProps) {
   }
 
   return (
-    <div
-      className={`${baseClass} relative group`}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      {isHovered && (
-        <button
-          onClick={() => setIsEditing(true)}
-          className="absolute top-2 right-2 p-1 text-gray-600 hover:text-gray-800 hover:bg-blue-100 rounded transition-colors"
-          title="Edit message"
-        >
-          <IconPencil size={16} />
-        </button>
-      )}
-      <div className={proseClasses}>
-        <ReactMarkdown
-          urlTransform={urlTransform}
-          remarkPlugins={[remarkMath, remarkLogseqPageRefs]}
-          rehypePlugins={[rehypeKatex]}
-          components={markdownComponents}
-        >
-          {sanitizeMarkdownHeadersToRfcBullets(filterPropertyLines(content))}
-        </ReactMarkdown>
+    <div className="flex items-start gap-3 ml-8">
+      <div
+        className={`${baseClass} relative group flex-1 min-w-0`}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        {isHovered && (
+          <button
+            onClick={() => setIsEditing(true)}
+            className="absolute top-2 right-2 p-1 text-gray-600 hover:text-gray-800 hover:bg-blue-100 rounded transition-colors z-10"
+            title="Edit message"
+          >
+            <IconPencil size={16} />
+          </button>
+        )}
+        <div className={proseClasses}>
+          <ReactMarkdown
+            urlTransform={urlTransform}
+            remarkPlugins={[remarkMath, remarkLogseqPageRefs]}
+            rehypePlugins={[rehypeKatex]}
+            components={markdownComponents}
+          >
+            {sanitizeMarkdownHeadersToRfcBullets(filterPropertyLines(content))}
+          </ReactMarkdown>
+        </div>
       </div>
+      {refCount > 0 && (
+        <div className="flex-shrink-0 mt-1">
+          <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-2 text-xs font-medium rounded-full bg-gray-200 dark:bg-logseq-cyan-low-saturation-800 text-gray-700 dark:text-logseq-cyan-low-saturation-300">
+            {refCount}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
 
 // Assistant message component for assistant responses
-function AssistantMessage({ content, block }: AssistantMessageProps) {
+function AssistantMessage({ content, block, refCount }: AssistantMessageProps) {
   const isFailed = block.properties?.status === "failed";
 
   return (
-    <div className="rounded-lg">
-      <div className={proseClasses}>
-        <ReactMarkdown
-          remarkPlugins={[remarkMath, remarkLogseqPageRefs]}
-          rehypePlugins={[rehypeKatex]}
-          components={markdownComponents}
-          urlTransform={urlTransform}
-        >
-          {sanitizeMarkdownHeadersToRfcBullets(filterPropertyLines(content))}
-        </ReactMarkdown>
+    <div className="rounded-lg flex items-start gap-3">
+      <div className="flex-1 min-w-0">
+        <div className={proseClasses}>
+          <ReactMarkdown
+            remarkPlugins={[remarkMath, remarkLogseqPageRefs]}
+            rehypePlugins={[rehypeKatex]}
+            components={markdownComponents}
+            urlTransform={urlTransform}
+          >
+            {sanitizeMarkdownHeadersToRfcBullets(filterPropertyLines(content))}
+          </ReactMarkdown>
+        </div>
+        {isFailed && (
+          <div className="mt-4 pt-3 border-t border-yellow-300 dark:border-yellow-600/50 flex items-start gap-2 text-yellow-700 dark:text-yellow-400">
+            <IconAlertTriangle size={20} className="shrink-0 mt-0.5" />
+            <span className="text-sm font-medium">
+              Something went wrong during the completion.
+            </span>
+          </div>
+        )}
       </div>
-      {isFailed && (
-        <div className="mt-4 pt-3 border-t border-yellow-300 dark:border-yellow-600/50 flex items-start gap-2 text-yellow-700 dark:text-yellow-400">
-          <IconAlertTriangle size={20} className="shrink-0 mt-0.5" />
-          <span className="text-sm font-medium">
-            Something went wrong during the completion.
+      {refCount > 0 && (
+        <div className="flex-shrink-0 mt-1">
+          <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-2 text-xs font-medium rounded-full bg-gray-200 dark:bg-logseq-cyan-low-saturation-800 text-gray-700 dark:text-logseq-cyan-low-saturation-300">
+            {refCount}
           </span>
         </div>
       )}
@@ -369,28 +391,32 @@ export function MessageList({
     <div
       ref={scrollContainerRef}
       onScroll={handleScroll}
-      className="flex-1 overflow-auto p-6 pb-4 space-y-4"
+      className="flex-1 overflow-auto py-6 pb-4"
     >
-      {messages.length === 0 && !isJobActive && (
-        <div className="text-gray-500 text-center">Ask me anything!</div>
-      )}
-      {messages.map((message, index) =>
-        message.message.role === "user" ? (
-          <UserMessage
-            key={index}
-            content={message.message.content}
-            blockId={message.block.uuid || ""}
-            onEdit={onEdit || (() => {})}
-          />
-        ) : (
-          <AssistantMessage
-            key={index}
-            content={message.message.content}
-            block={message.block}
-          />
-        )
-      )}
-      {isJobActive && !isStreaming && <ThinkingIndicator />}
+      <div className="px-4 space-y-4">
+        {messages.length === 0 && !isJobActive && (
+          <div className="text-gray-500 text-center">Ask me anything!</div>
+        )}
+        {messages.map((message, index) =>
+          message.message.role === "user" ? (
+            <UserMessage
+              key={index}
+              content={message.message.content}
+              blockId={message.block.uuid || ""}
+              onEdit={onEdit || (() => {})}
+              refCount={message.blockReferences.length}
+            />
+          ) : (
+            <AssistantMessage
+              key={index}
+              refCount={message.blockReferences.length}
+              content={message.message.content}
+              block={message.block}
+            />
+          )
+        )}
+        {isJobActive && !isStreaming && <ThinkingIndicator />}
+      </div>
     </div>
   );
 }

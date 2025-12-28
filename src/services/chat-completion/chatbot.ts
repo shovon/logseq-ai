@@ -1,4 +1,4 @@
-import type { Message } from "../logseq/querier";
+import type { Message } from "../threading/querier";
 import type { ChatCompletionJobEvent } from "./chat-completion-job-event";
 
 /**

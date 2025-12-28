@@ -1,6 +1,6 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { stepCountIs, streamText, type Tool, tool } from "ai";
-import type { Message } from "../logseq/querier";
+import type { Message } from "../threading/querier";
 import { experimental_createMCPClient as createMCPClient } from "@ai-sdk/mcp";
 import { loadMCPServers } from "./mcp";
 import { generateImage } from "../image-generation/fal-image-gen";

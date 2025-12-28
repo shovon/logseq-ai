@@ -6,11 +6,11 @@ import {
   type BlockMessage,
   deleteAllMessagesAfterBlock,
   searchPagesByName,
-} from "../services/logseq/querier";
+} from "../services/threading/querier";
 import {
   appendMessageToThread,
   loadThreadMessageBlocks,
-} from "../services/logseq/querier";
+} from "../services/threading/querier";
 import { completionJobManager } from "../services/chat-completion/completion-job-manager";
 import { createCompletionJob } from "../services/chat-completion/completion-task";
 import { sanitizeMarkdown } from "../utils/utils";
