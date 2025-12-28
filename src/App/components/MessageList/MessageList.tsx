@@ -7,7 +7,7 @@ import {
   filterPropertyLines,
   sanitizeMarkdownHeadersToRfcBullets,
 } from "../../../utils/utils";
-import type { BlockMessage } from "../../../services/threading/querier";
+import type { BlockMessage } from "../../../services/threading/threading";
 import type { BlockEntity } from "@logseq/libs/dist/LSPlugin.user";
 import type { Components } from "react-markdown";
 import { remarkLogseqPageRefs } from "./remark-logseq-page-refs";

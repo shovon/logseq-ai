@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Message } from "../../threading/querier";
+import type { Message } from "../../threading/threading";
 import { buildEnhancedMessage } from "../agent-orchestrator";
 import type { Chatbot } from "../chatbot";
 import type { ChatCompletionJobEvent } from "../chat-completion-job-event";

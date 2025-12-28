@@ -1,4 +1,4 @@
-import { createChatThreadPage, type Message } from "./threading/querier";
+import { createChatThreadPage, type Message } from "./threading/threading";
 
 // Things to be effective with threads.
 //

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   getAllChatThreads,
   type PageType,
-} from "../services/threading/querier";
+} from "../services/threading/threading";
 import { categorizeDateByPeriod, type TimePeriod } from "../utils/utils";
 import { onRouteChanged } from "../services/logseq/route-change-service";
 

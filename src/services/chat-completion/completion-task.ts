@@ -1,4 +1,4 @@
-import type { Message } from "../threading/querier";
+import type { Message } from "../threading/threading";
 import type {
   JobKey,
   CompletionState,
