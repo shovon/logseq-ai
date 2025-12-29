@@ -4,12 +4,12 @@ import { MessageList } from "./components/MessageList/MessageList";
 import {
   type Message,
   type BlockMessage,
-  deleteAllMessagesAfterBlock,
   searchPagesByName,
-} from "../services/threading/threading";
-import {
   appendMessageToThread,
   loadThreadMessageBlocks,
+  getCurrentThreadId,
+  setCurrentThreadId,
+  forkThread,
 } from "../services/threading/threading";
 import { completionJobManager } from "../services/chat-completion/completion-job-manager";
 import { createCompletionJob } from "../services/chat-completion/completion-task";
@@ -104,18 +104,25 @@ function useCompletionJob(pageId: string) {
 
 export function ChatThreadView({ pageId }: ChatThreadViewProps) {
   const [messages, setMessages] = useState<BlockMessage[]>([]);
+  const [currentThreadId, setCurrentThreadIdState] = useState<string | null>(
+    null
+  );
   const { isJobActive, isStreaming, job } = useCompletionJob(pageId);
 
   const loadMessages = useMemo(
-    () => () => {
-      loadThreadMessageBlocks(pageId)
-        .then((loadedMessages) => {
-          setMessages(loadedMessages);
-        })
-        .catch((error) => {
-          console.error("Error loading thread messages:", error);
-          logseq.UI.showMsg(`Error loading messages: ${error}`, "error");
-        });
+    () => async () => {
+      try {
+        // Get current threadId from page properties
+        const threadId = await getCurrentThreadId(pageId);
+        setCurrentThreadIdState(threadId);
+
+        // Load messages for the current thread
+        const loadedMessages = await loadThreadMessageBlocks(pageId, threadId);
+        setMessages(loadedMessages);
+      } catch (error) {
+        console.error("Error loading thread messages:", error);
+        logseq.UI.showMsg(`Error loading messages: ${error}`, "error");
+      }
     },
     [pageId]
   );
@@ -137,15 +144,32 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
         content: m.message.content,
       }));
 
-      // Append user message block
-      await appendMessageToThread(pageId, {
-        role: "user",
-        content: currentInput,
-      } as Message);
+      // Get current threadId (may be null for main thread)
+      const threadId = currentThreadId;
 
-      // Spawn completion job for assistant reply
+      // Append user message block (with thread metadata only if in a forked thread)
+      await appendMessageToThread(
+        pageId,
+        {
+          role: "user",
+          content: currentInput,
+        } as Message,
+        threadId
+          ? {
+              threadId,
+              // No referenceId for regular messages, only for fork roots
+            }
+          : undefined
+      );
+
+      // Spawn completion job for assistant reply (with thread metadata only if in a forked thread)
       completionJobManager.runJob(pageId, () =>
-        createCompletionJob(currentInput, priorMessages, pageId)
+        createCompletionJob(
+          currentInput,
+          priorMessages,
+          pageId,
+          threadId ? { threadId } : undefined
+        )
       );
     } catch (e) {
       logseq.UI.showMsg(`${e ?? ""}`, "error");
@@ -156,21 +180,51 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
     newContent = sanitizeMarkdown(newContent);
 
     try {
-      await logseq.Editor.updateBlock(blockId, newContent, {
-        properties: { role: "user" },
+      // Build prior messages BEFORE forking (from the current thread)
+      // We need messages up to (but not including) the edited block
+      const priorMessages: Message[] = messages
+        .filter((m) => m.block.uuid !== blockId)
+        .map((m) => ({
+          role: m.message.role,
+          content: m.message.content,
+        })) as Message[];
+
+      // Fork a new thread from the edited block
+      const newThreadId = await forkThread(blockId, pageId);
+
+      // Set the new thread as the current thread
+      await setCurrentThreadId(pageId, newThreadId);
+      setCurrentThreadIdState(newThreadId);
+
+      // Append the edited message as the root of the new thread fork
+      // This creates a new block that serves as the root with referenceId
+      // pointing to the original block (which remains for record-keeping)
+      await appendMessageToThread(
+        pageId,
+        {
+          role: "user",
+          content: newContent,
+        } as Message,
+        {
+          threadId: newThreadId,
+          referenceId: blockId,
+        }
+      );
+
+      // Add the new edited message to prior messages for completion
+      priorMessages.push({
+        role: "user",
+        content: newContent,
       });
 
-      await deleteAllMessagesAfterBlock({ pageId, blockId });
-
-      // Build prior messages for completion
-      const priorMessages: Message[] = messages.map((m) => ({
-        role: m.message.role,
-        content: m.message.content,
-      })) as Message[];
+      // Reload messages from the new thread
+      await loadMessages();
 
       // Spawn completion job for assistant reply
       completionJobManager.runJob(pageId, () =>
-        createCompletionJob(newContent, priorMessages, pageId)
+        createCompletionJob(newContent, priorMessages, pageId, {
+          threadId: newThreadId,
+        })
       );
     } catch (e) {
       console.error("Error updating message:", e);

@@ -26,6 +26,7 @@ export function NewChatView({ onThreadCreated }: NewChatViewProps) {
       const pageId = await createNewChatThread(currentInput);
 
       // Start completion job for assistant reply (no prior messages for new chat)
+      // New chats use main thread (null threadId)
       completionJobManager.runJob(pageId, () =>
         createCompletionJob(currentInput, [], pageId)
       );
