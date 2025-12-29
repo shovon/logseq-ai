@@ -105,6 +105,342 @@ export type BlockMessage = {
   blockReferences: BlockEntity[];
 };
 
+export type ThreadMetadata = {
+  threadId?: string; // UUID for forked threads only
+  referenceId?: string; // Block UUID, only on root of forked thread
+  threadHash?: string; // SHA-256 hash of predecessor block IDs
+};
+
+export type ThreadedBlock = BlockEntity & {
+  threadMetadata?: ThreadMetadata;
+};
+
+export type Thread = {
+  threadId: string | null; // null for main thread
+  blocks: ThreadedBlock[];
+  referenceId?: string; // Only for forked threads
+  isValid: boolean; // Hash validation result
+};
+
+/**
+ * Computes a SHA-256 hash of block IDs concatenated in order.
+ * Used to validate thread integrity.
+ */
+export const computeThreadHash = async (
+  blockIds: string[]
+): Promise<string> => {
+  // Concatenate block IDs in order and hash with SHA-256
+  const concatenated = blockIds.join("|");
+  const encoder = new TextEncoder();
+  const data = encoder.encode(concatenated);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+};
+
+/**
+ * Extracts thread metadata from block properties.
+ */
+export const extractThreadMetadata = (
+  block: BlockEntity
+): ThreadMetadata | undefined => {
+  const props = block.properties;
+  if (!props) {
+    return undefined;
+  }
+
+  const threadId =
+    typeof props.threadId === "string" ? props.threadId : undefined;
+  const referenceId =
+    typeof props.referenceId === "string" ? props.referenceId : undefined;
+  const threadHash =
+    typeof props.threadHash === "string" ? props.threadHash : undefined;
+
+  if (!threadId && !referenceId && !threadHash) {
+    return undefined;
+  }
+
+  return {
+    threadId,
+    referenceId,
+    threadHash,
+  };
+};
+
+/**
+ * Gets all blocks that come before a given block in the page.
+ * Used to compute thread hash from predecessors.
+ */
+export const getPredecessorBlocks = async (
+  blockId: string,
+  pageId: string
+): Promise<BlockEntity[]> => {
+  // Get all blocks from the page
+  const allBlocks =
+    ((await logseq.Editor.getPageBlocksTree(
+      pageId
+    )) as Array<BlockEntity> | null) ?? [];
+
+  // Find the index of the target block
+  const targetIndex = allBlocks.findIndex((block) => block.uuid === blockId);
+  if (targetIndex === -1) {
+    throw new Error(`Block ${blockId} not found in page ${pageId}`);
+  }
+
+  // Return all blocks before the target block
+  return allBlocks.slice(0, targetIndex);
+};
+
+/**
+ * Validates thread integrity for a given set of blocks.
+ * Internal helper that doesn't cause circular dependencies.
+ */
+const validateThreadIntegrityForBlocks = async (
+  threadBlocks: ThreadedBlock[],
+  pageId: string
+): Promise<boolean> => {
+  if (threadBlocks.length === 0) {
+    return false;
+  }
+
+  // Get the first block's predecessors to compute expected hash
+  const firstBlock = threadBlocks[0];
+  const predecessors = await getPredecessorBlocks(firstBlock.uuid, pageId);
+  const predecessorIds = predecessors.map((b) => b.uuid);
+
+  // Compute expected hash
+  const expectedHash = await computeThreadHash(predecessorIds);
+
+  // Check if the first block's hash matches
+  const firstBlockMetadata = extractThreadMetadata(firstBlock);
+  if (!firstBlockMetadata?.threadHash) {
+    return false;
+  }
+
+  return firstBlockMetadata.threadHash === expectedHash;
+};
+
+/**
+ * Gets all blocks in a specific thread by threadId.
+ */
+export const getThreadByThreadId = async (
+  threadId: string,
+  pageId: string
+): Promise<Thread> => {
+  // Get all blocks from the page
+  const allBlocks =
+    ((await logseq.Editor.getPageBlocksTree(
+      pageId
+    )) as Array<BlockEntity> | null) ?? [];
+
+  // Filter blocks that belong to this thread
+  const threadBlocks: ThreadedBlock[] = [];
+  let referenceId: string | undefined;
+
+  for (const block of allBlocks) {
+    const metadata = extractThreadMetadata(block);
+    if (metadata?.threadId === threadId) {
+      threadBlocks.push({
+        ...block,
+        threadMetadata: metadata,
+      });
+      // Capture referenceId from the root block (first block in thread)
+      if (metadata.referenceId && !referenceId) {
+        referenceId = metadata.referenceId;
+      }
+    }
+  }
+
+  // Validate thread integrity
+  const isValid =
+    threadBlocks.length > 0
+      ? await validateThreadIntegrityForBlocks(threadBlocks, pageId)
+      : false;
+
+  return {
+    threadId,
+    blocks: threadBlocks,
+    referenceId,
+    isValid,
+  };
+};
+
+/**
+ * Gets the thread containing a specific block by traversing up the graph.
+ * Returns null if the block is not part of any thread (main thread).
+ */
+export const getThreadByBlockId = async (
+  blockId: string,
+  pageId: string
+): Promise<Thread | null> => {
+  const block = await logseq.Editor.getBlock(blockId);
+  if (!block) {
+    return null;
+  }
+
+  const metadata = extractThreadMetadata(block);
+
+  // If block has no threadId, it's part of the main thread
+  if (!metadata?.threadId) {
+    // Return main thread (null threadId)
+    return getAllThreadsInPage(pageId).then(
+      (threads) => threads.get(null) || null
+    );
+  }
+
+  // Block is part of a forked thread
+  return getThreadByThreadId(metadata.threadId, pageId);
+};
+
+/**
+ * Gets all threads in a page, including the main thread (null threadId)
+ * and all forked threads.
+ */
+export const getAllThreadsInPage = async (
+  pageId: string
+): Promise<Map<string | null, Thread>> => {
+  // Get all blocks from the page
+  const allBlocks =
+    ((await logseq.Editor.getPageBlocksTree(
+      pageId
+    )) as Array<BlockEntity> | null) ?? [];
+
+  const threadsMap = new Map<string | null, Thread>();
+  const threadBlocksMap = new Map<string | null, ThreadedBlock[]>();
+  const referenceIdsMap = new Map<string | null, string>();
+
+  // Separate blocks into threads
+  for (const block of allBlocks) {
+    const metadata = extractThreadMetadata(block);
+    const threadId = metadata?.threadId || null;
+
+    if (!threadBlocksMap.has(threadId)) {
+      threadBlocksMap.set(threadId, []);
+    }
+
+    threadBlocksMap.get(threadId)!.push({
+      ...block,
+      threadMetadata: metadata,
+    });
+
+    // Capture referenceId for forked threads
+    if (metadata?.referenceId && threadId !== null) {
+      referenceIdsMap.set(threadId, metadata.referenceId);
+    }
+  }
+
+  // Build Thread objects and validate integrity
+  for (const [threadId, blocks] of threadBlocksMap.entries()) {
+    const isValid =
+      threadId !== null && blocks.length > 0
+        ? await validateThreadIntegrityForBlocks(blocks, pageId)
+        : true; // Main thread is always considered valid
+
+    threadsMap.set(threadId, {
+      threadId,
+      blocks,
+      referenceId: referenceIdsMap.get(threadId || ""),
+      isValid,
+    });
+  }
+
+  return threadsMap;
+};
+
+/**
+ * Validates thread integrity by checking if the stored hash matches
+ * the current block order. Returns false if the thread is invalid
+ * (blocks have been reordered or deleted).
+ */
+export const validateThreadIntegrity = async (
+  threadId: string,
+  pageId: string
+): Promise<boolean> => {
+  // Get all blocks in the thread
+  const thread = await getThreadByThreadId(threadId, pageId);
+  return thread.isValid;
+};
+
+/**
+ * Finds all blocks that reference a specific block (all forks of a message).
+ * These are blocks that have the given blockId as their referenceId.
+ */
+export const getAlternativeVersions = async (
+  referenceBlockId: string,
+  pageId: string
+): Promise<ThreadedBlock[]> => {
+  // Get all blocks from the page
+  const allBlocks =
+    ((await logseq.Editor.getPageBlocksTree(
+      pageId
+    )) as Array<BlockEntity> | null) ?? [];
+
+  // Filter blocks that have this block as their referenceId
+  const alternatives: ThreadedBlock[] = [];
+  for (const block of allBlocks) {
+    const metadata = extractThreadMetadata(block);
+    if (metadata?.referenceId === referenceBlockId) {
+      alternatives.push({
+        ...block,
+        threadMetadata: metadata,
+      });
+    }
+  }
+
+  return alternatives;
+};
+
+/**
+ * Reconstructs a thread by traversing up from a given block.
+ * Returns the full thread containing the block, or null if not found.
+ */
+export const reconstructThreadFromBlock = async (
+  blockId: string,
+  pageId: string
+): Promise<Thread | null> => {
+  return getThreadByBlockId(blockId, pageId);
+};
+
+// TODO: based on the comment, this does not actually edit anything; just return
+// some "thread ID", but with guardrails.
+/**
+ * Creates a new thread fork starting at a reference block.
+ * Returns a new threadId (UUID) that should be used when appending
+ * messages to this fork. The actual fork is created when the first
+ * message is appended with this threadId and the referenceId.
+ */
+export const forkThread = async (
+  referenceBlockId: string,
+  pageId: string
+): Promise<string> => {
+  // Validate that the reference block exists and belongs to the page
+  const referenceBlock = await logseq.Editor.getBlock(referenceBlockId);
+  if (!referenceBlock) {
+    throw new Error(`Reference block ${referenceBlockId} not found`);
+  }
+
+  // Validate page
+  const page = await logseq.Editor.getPage(pageId);
+  if (!page) {
+    throw new Error(`Page ${pageId} not found`);
+  }
+
+  // Validate that the block belongs to the page
+  const blockPageId =
+    referenceBlock.page?.uuid || String(referenceBlock.page?.id || "");
+  if (page.id !== referenceBlock.page?.id) {
+    throw new Error(
+      `Block ${referenceBlockId} does not belong to page ${pageId}. ` +
+        `Block belongs to page ${blockPageId || "unknown"}`
+    );
+  }
+
+  // Generate a new threadId (UUID)
+  const threadId = crypto.randomUUID();
+
+  return threadId;
+};
+
 export const getAllChatThreads = async (): Promise<PageType[]> => {
   const result = await logseq.DB.datascriptQuery(`
     [:find (pull ?p [*])
@@ -283,11 +619,51 @@ export const createChatThreadPage = async (
 
 export const appendMessageToThread = async (
   pageUuid: string,
-  message: Message
-): Promise<void> => {
-  await logseq.Editor.appendBlockInPage(pageUuid, message.content, {
-    properties: { role: message.role },
-  });
+  message: Message,
+  options?: {
+    threadId?: string;
+    referenceId?: string;
+  }
+): Promise<string> => {
+  // Build properties object
+  const properties: Record<string, unknown> = { role: message.role };
+
+  // If this is a forked thread, add thread metadata
+  if (options?.threadId) {
+    properties.threadId = options.threadId;
+
+    // If this is the root of a fork, add referenceId
+    if (options.referenceId) {
+      properties.referenceId = options.referenceId;
+    }
+
+    // Compute thread hash from all predecessor blocks
+    // Get all blocks in the page to find the current position
+    const allBlocks =
+      ((await logseq.Editor.getPageBlocksTree(
+        pageUuid
+      )) as Array<BlockEntity> | null) ?? [];
+
+    // Get all predecessor block IDs
+    const predecessorIds = allBlocks.map((b) => b.uuid);
+
+    // Compute hash
+    const threadHash = await computeThreadHash(predecessorIds);
+    properties.threadHash = threadHash;
+  }
+
+  // Append the block
+  const newBlock = await logseq.Editor.appendBlockInPage(
+    pageUuid,
+    message.content,
+    { properties }
+  );
+
+  if (!newBlock) {
+    throw new Error("Failed to append message to thread");
+  }
+
+  return newBlock.uuid;
 };
 
 export const searchPagesByName = async (
