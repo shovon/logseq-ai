@@ -1,0 +1,77 @@
+---
+alwaysApply: true
+---
+
+## Nominal typing in TypeScript
+
+TypeScript doesn't support nominal typing per-se. That said we can emulate it using branded types and symbols.
+
+### Branded types
+
+A common idiom among TypeScript developers is the concept of a branded type.
+
+Imagine an object that holds a field `type` that's a string, and a value `data` who's type is parameterized by a generic, `T`.
+
+An object that isn't branded would take on the following shape:
+
+```typescript
+type NonBrandedType<T> = {
+  type: string;
+  data: T;
+};
+```
+
+A branded type would take on the following shape:
+
+```typescript
+type BrandedType<T> = {
+  __brand: unknown;
+  type: string;
+  data: T;
+};
+```
+
+However, one critical flaw is that brandedness doesn't stop anyone from initializing an object that wasn't initialized by the "brand". For example, a library that needs strict control for object creation shouldn't trust the use of some `__brand` field that just about anyone can create.
+
+### Stronger Brandedness: nominal types
+
+This will require a combination of using symbols and a weakmap to truly make things branded. It's not a compile-time guarantee but it is one way of deterring client code from constructing branded types without the library doing so.
+
+#### Symbols
+
+TypeScript supports typing unique symbols. Better yet, you can have it not be exported and client codes will simply not be able to construct the object.
+
+```typescript
+const brandTag: unique symbol = Symbol("brand");
+
+export type BrandedType<T> = Readonly<{
+  [brandTag]: true;
+  type: string;
+  data: T;
+}>;
+```
+
+But that still doesn't stop clients from using reflections to extract that symbol to fabricate some type.
+
+#### WeakSet
+
+We can combine the above solution with a WeakMap to really tell at runtime whether the object was fabricated externally, or was branded internally before sending it out to clients.
+
+```diff
++const brandPool = WeakSet<object>
++
+const brandTag: unique symbol = Symbol('brand');
+
+export type BrandedType<T> = Readonly<{
+  [brandTag]: true,
+  type: string,
+  data: T
+}>
++
++const create = () => {
++  // Creation logic
++  declare const myObject: BrandedType<string>;
++  brandPool.add(myObject);
++  return myObject;
++};
+```

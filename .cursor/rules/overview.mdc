@@ -2,4 +2,5 @@
 alwaysApply: true
 ---
 
-When I refer to "page" or "pages", I'm always talking about a Logseq page, and therefore.
+- When a prompt refers to "page" or "pages", it's almost always referring to a Logseq page.
+- When a prompt refers to a "block" or "blocks", it's almost always referring to a block in a Logseq page.
