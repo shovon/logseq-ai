@@ -3,3 +3,4 @@ alwaysApply: true
 ---
 
 - **user prompt**: the prompt sent by the user. Usually the message sent to a chatbot—often backed by an LLM—to yield an assistant response.
+- **assistant response**: the response received by the chatbot.
