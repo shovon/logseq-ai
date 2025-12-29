@@ -58,7 +58,7 @@ But that still doesn't stop clients from using reflections to extract that symbo
 We can combine the above solution with a WeakMap to really tell at runtime whether the object was fabricated externally, or was branded internally before sending it out to clients.
 
 ```diff
-+const brandPool = WeakSet<object>
++const brandPool = WeakSet<object>;
 +
 const brandTag: unique symbol = Symbol('brand');
 
@@ -66,7 +66,7 @@ export type BrandedType<T> = Readonly<{
   [brandTag]: true,
   type: string,
   data: T
-}>
+}>;
 +
 +const create = () => {
 +  // Creation logic

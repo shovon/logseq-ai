@@ -1,0 +1,7 @@
+---
+alwaysApply: true
+---
+
+We have threads.
+
+Either a thread has a thread ID, or it doesn't. If it doesn't then it is assumed that the block belongs to the main thread.

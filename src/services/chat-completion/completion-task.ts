@@ -19,11 +19,11 @@ import { gate, sanitizeMarkdown } from "../../utils/utils";
 import { start as startPipe } from "../../utils/functional/pipe";
 import { scan } from "../../utils/async-iterables/scan";
 import { forEach } from "../../utils/async-iterables/for-each/for-each";
-import { updateBlock } from "../logseq/helpers";
 import { filter } from "../../utils/async-iterables/filter";
 import type { BlockEntity } from "@logseq/libs/dist/LSPlugin.user";
 import { first } from "../../utils/async-iterables/first";
 import { dumbYesChatbot } from "./chatbots/dumb-say-yes";
+import { computeThreadHash } from "../threading/threading";
 
 export function acceptor(ch: (a: unknown, b: unknown) => unknown) {
   return ch(1, 2);
@@ -47,18 +47,32 @@ const imageStream = filter(
  *   output chunks.
  * @param props Record of Logseq property key-value pairs to prefix to the block.
  * @param block The Logseq block entity to update as new content arrives.
+ * @param blockProperties Optional record of Logseq block properties to set/update
+ *   during streaming. These are actual block properties (not string prefixes).
  */
 const streamInText = async (
   events: AsyncIterable<TextDeltaEvent>,
   props: Record<string, string>,
-  block: BlockEntity
+  block: BlockEntity,
+  blockProperties?: Record<string, unknown>
 ) => {
   await startPipe(events)
     .pipe(map((event) => event.delta))
     .pipe(scan((c, el) => c.concat(el), ""))
     .pipe(map(sanitizeMarkdown))
     .pipe(map((content) => `${propsToString(props)}\n${content}`))
-    .pipe(forEach(updateBlock(block.uuid))).value;
+    .pipe(
+      forEach(async (content) => {
+        // Update both content and properties if blockProperties are provided
+        if (blockProperties) {
+          await logseq.Editor.updateBlock(block.uuid, content, {
+            properties: blockProperties,
+          });
+        } else {
+          await logseq.Editor.updateBlock(block.uuid, content);
+        }
+      })
+    ).value;
 };
 
 /**
@@ -92,10 +106,17 @@ const streamInImages = async (
 export const createCompletionJob: (
   input: string,
   messages: Message[],
-  jobKey: JobKey
-) => Job<CompletionState, CompletionAction> = (input, messages, jobKey) => {
-  // Perhaps this is where we can introduce
-
+  jobKey: JobKey,
+  options?: {
+    threadId?: string;
+    referenceId?: string;
+  }
+) => Job<CompletionState, CompletionAction> = (
+  input,
+  messages,
+  jobKey,
+  options
+) => {
   const stopGate = gate();
   const stateSubject = subject<CompletionState>();
   const abortController = new AbortController();
@@ -115,9 +136,39 @@ export const createCompletionJob: (
   (async function () {
     const props = { role: "assistant" };
 
+    // Build block properties object (for actual Logseq properties, not string prefixes)
+    const blockProperties: Record<string, unknown> = { role: "assistant" };
+
+    // If this is a forked thread, add thread metadata
+    if (options?.threadId) {
+      blockProperties["thread-id"] = options.threadId;
+
+      // If this is the root of a fork, add referenceId and compute hash
+      if (options.referenceId) {
+        blockProperties["reference-id"] = options.referenceId;
+
+        // Compute thread hash from all predecessor blocks (only for fork roots)
+        // Get all blocks in the page (these are all predecessors since we're appending)
+        const allBlocks =
+          ((await logseq.Editor.getPageBlocksTree(
+            jobKey
+          )) as Array<BlockEntity> | null) ?? [];
+
+        // Get all predecessor block IDs (all existing blocks before we append the new assistant block)
+        // Since we're appending, all existing blocks are predecessors
+        const predecessorIds = allBlocks.map((b) => b.uuid);
+
+        // Compute hash from predecessor block IDs
+        const threadHash = await computeThreadHash(predecessorIds);
+        blockProperties["thread-hash"] = threadHash;
+      }
+    }
+
+    // Create block with initial properties
     const block = await logseq.Editor.appendBlockInPage(
       jobKey,
-      propsToString(props)
+      propsToString(props),
+      { properties: blockProperties }
     );
 
     try {
@@ -136,7 +187,13 @@ export const createCompletionJob: (
         hasRun = true;
       };
 
-      const textStream = streamInText(textDeltaStream(t1), props, block);
+      // Pass blockProperties to streamInText so it updates properties during streaming
+      const textStream = streamInText(
+        textDeltaStream(t1),
+        props,
+        block,
+        blockProperties
+      );
       const imagesStream = streamInImages(imageStream(t2), jobKey);
       const checkIfHasRun = first(notifyIsStreaming)(t3);
 
@@ -154,7 +211,8 @@ export const createCompletionJob: (
       if (block?.uuid) {
         await logseq.Editor.updateBlock(
           block.uuid,
-          `${propsToString(props)}\n${block.body}`
+          `${propsToString(props)}\n${block.body}`,
+          { properties: blockProperties }
         );
       } else {
         await logseq.Editor.appendBlockInPage(

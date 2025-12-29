@@ -188,7 +188,7 @@ export const getPredecessorBlocks = async (
   }
 
   // Return all blocks before the target block
-  return allBlocks.slice(0, targetIndex);
+  return allBlocks.slice(0, targetIndex + 1);
 };
 
 /**
@@ -234,24 +234,50 @@ export const getThreadByThreadId = async (
     )) as Array<BlockEntity> | null) ?? [];
 
   // Filter blocks that belong to this thread
-  const threadBlocks: ThreadedBlock[] = [];
   let referenceId: string | undefined;
 
-  for (const block of allBlocks) {
-    const metadata = extractThreadMetadata(block);
-    if (metadata?.threadId === threadId) {
-      threadBlocks.push({
-        ...block,
-        threadMetadata: metadata,
-      });
-      // Capture referenceId from the root block (first block in thread)
-      if (metadata.referenceId && !referenceId) {
-        referenceId = metadata.referenceId;
-      }
+  let threadBlocks: BlockEntity[] = allBlocks.filter(
+    (block) => block.properties?.threadId === threadId
+  );
+
+  let withReference = threadBlocks[0].properties?.referenceId
+    ? threadBlocks[0]
+    : null;
+
+  while (withReference) {
+    console.log(withReference);
+    const referenceId = withReference.properties?.referenceId;
+    const predecessorBlocks = await getPredecessorBlocks(referenceId, pageId);
+    const blockOfReference = predecessorBlocks.find((block) => {
+      return block.uuid === referenceId;
+    });
+    if (!blockOfReference) {
+      break;
     }
+    if (!blockOfReference.properties?.threadId) {
+      threadBlocks = [
+        ...predecessorBlocks.filter(
+          (block) => !block.properties?.threadId && block.uuid !== referenceId
+        ),
+        ...threadBlocks,
+      ];
+    } else {
+      threadBlocks = [
+        ...predecessorBlocks.filter((block) => {
+          return (
+            block.properties?.threadId ===
+              blockOfReference.properties?.threadId &&
+            block.uuid !== referenceId
+          );
+        }),
+        ...threadBlocks,
+      ];
+    }
+    withReference = threadBlocks[0].properties?.referenceId
+      ? threadBlocks[0]
+      : null;
   }
 
-  // Validate thread integrity
   const isValid =
     threadBlocks.length > 0
       ? await validateThreadIntegrityForBlocks(threadBlocks, pageId)
@@ -441,6 +467,97 @@ export const forkThread = async (
   return threadId;
 };
 
+/**
+ * Gets the current-thread property from the page's first block.
+ * Returns null if no current-thread is set (main thread).
+ */
+export const getCurrentThreadId = async (
+  pageId: string
+): Promise<string | null> => {
+  const page = await logseq.Editor.getPage(pageId);
+  if (!page) {
+    throw new Error(`Page ${pageId} not found`);
+  }
+
+  // Get all blocks from the page
+  const blocks =
+    ((await logseq.Editor.getPageBlocksTree(
+      pageId
+    )) as Array<BlockEntity> | null) ?? [];
+
+  // Get the first block (where page properties are stored)
+  const firstBlock = blocks[0];
+  if (!firstBlock) {
+    // No blocks yet, return null (main thread)
+    return null;
+  }
+
+  // Extract current-thread from properties
+  const currentThreadId = firstBlock.properties?.currentThread;
+  if (typeof currentThreadId === "string") {
+    return currentThreadId;
+  }
+
+  return null;
+};
+
+/**
+ * Sets the current-thread property on the page's first block.
+ * If threadId is null, removes the property (main thread).
+ */
+export const setCurrentThreadId = async (
+  pageId: string,
+  threadId: string | null
+): Promise<void> => {
+  const page = await logseq.Editor.getPage(pageId);
+  if (!page) {
+    throw new Error(`Page ${pageId} not found`);
+  }
+
+  // Get all blocks from the page
+  const blocks =
+    ((await logseq.Editor.getPageBlocksTree(
+      pageId
+    )) as Array<BlockEntity> | null) ?? [];
+
+  // Get or create the first block (where page properties are stored)
+  let firstBlock = blocks[0];
+
+  if (!firstBlock) {
+    // Create first block if it doesn't exist
+    const newBlock = await logseq.Editor.appendBlockInPage(pageId, "", {
+      properties: {},
+    });
+    if (!newBlock) {
+      throw new Error("Failed to create first block for page properties");
+    }
+    firstBlock = newBlock;
+  }
+
+  // Get current properties
+  const currentProperties = firstBlock.properties || {};
+  const updatedProperties: Record<string, unknown> = { ...currentProperties };
+
+  // Clean up any camelCase/PascalCase variants of current-thread property
+  // (e.g., currentThread, currentthread, CurrentThread) to ensure we only use kebab-case
+  delete updatedProperties["currentThread"];
+  delete updatedProperties["currentthread"];
+  delete updatedProperties["CurrentThread"];
+
+  if (threadId === null) {
+    // Remove current-thread property for main thread
+    delete updatedProperties["current-thread"];
+  } else {
+    // Set current-thread property
+    updatedProperties["current-thread"] = threadId;
+  }
+
+  // Update the first block with new properties
+  await logseq.Editor.updateBlock(firstBlock.uuid, firstBlock.content, {
+    properties: updatedProperties,
+  });
+};
+
 export const getAllChatThreads = async (): Promise<PageType[]> => {
   const result = await logseq.DB.datascriptQuery(`
     [:find (pull ?p [*])
@@ -490,17 +607,26 @@ export const getAllBlockReferences = async (
 };
 
 export const loadThreadMessageBlocks = async (
-  pageUuid: string
+  pageUuid: string,
+  threadId?: string | null
 ): Promise<BlockMessage[]> => {
-  // TODO: once logseq/logseq#12212 gets merged and deployed, we need to get rid
-  //   of the type assertion.
-  const blocks =
-    ((await logseq.Editor.getPageBlocksTree(
-      pageUuid
-    )) as Array<BlockEntity> | null) ?? [];
+  // Get blocks from the specific thread only
+  let threadBlocks: ThreadedBlock[];
 
-  // Filter top-level blocks with role property set to "user" or "assistant"
-  const messageBlocks = blocks.filter(
+  // TODO: check to see if this clause is even useful or not.
+  if (threadId === undefined || threadId === null) {
+    // Main thread: get all threads and extract the main thread (null key)
+    const allThreads = await getAllThreadsInPage(pageUuid);
+    const mainThread = allThreads.get(null);
+    threadBlocks = mainThread?.blocks ?? [];
+  } else {
+    // Forked thread: get blocks from the specific thread
+    const thread = await getThreadByThreadId(threadId, pageUuid);
+    threadBlocks = thread.blocks;
+  }
+
+  // Filter blocks with role property set to "user" or "assistant"
+  const messageBlocks = threadBlocks.filter(
     (block) =>
       block.properties?.role === "user" ||
       block.properties?.role === "assistant"
@@ -630,26 +756,26 @@ export const appendMessageToThread = async (
 
   // If this is a forked thread, add thread metadata
   if (options?.threadId) {
-    properties.threadId = options.threadId;
+    properties["thread-id"] = options.threadId;
 
-    // If this is the root of a fork, add referenceId
+    // If this is the root of a fork, add referenceId and compute hash
     if (options.referenceId) {
-      properties.referenceId = options.referenceId;
+      properties["reference-id"] = options.referenceId;
+
+      // Compute thread hash from all predecessor blocks (only for fork roots)
+      // Get all blocks in the page to find the current position
+      const allBlocks =
+        ((await logseq.Editor.getPageBlocksTree(
+          pageUuid
+        )) as Array<BlockEntity> | null) ?? [];
+
+      // Get all predecessor block IDs
+      const predecessorIds = allBlocks.map((b) => b.uuid);
+
+      // Compute hash
+      const threadHash = await computeThreadHash(predecessorIds);
+      properties["thread-hash"] = threadHash;
     }
-
-    // Compute thread hash from all predecessor blocks
-    // Get all blocks in the page to find the current position
-    const allBlocks =
-      ((await logseq.Editor.getPageBlocksTree(
-        pageUuid
-      )) as Array<BlockEntity> | null) ?? [];
-
-    // Get all predecessor block IDs
-    const predecessorIds = allBlocks.map((b) => b.uuid);
-
-    // Compute hash
-    const threadHash = await computeThreadHash(predecessorIds);
-    properties.threadHash = threadHash;
   }
 
   // Append the block
