@@ -577,6 +577,9 @@ export const getAllChatThreads = async (): Promise<PageType[]> => {
   });
 };
 
+// Cache for block references promises to prevent unnecessary re-fetching
+const blockReferencesCache = new Map<string, Promise<BlockEntity[]>>();
+
 export const getAllBlockReferences = async (
   blockId: string
 ): Promise<BlockEntity[]> => {
@@ -603,6 +606,27 @@ export const getAllBlockReferences = async (
     console.error(e);
     return [];
   }
+};
+
+/**
+ * Gets block references with caching to prevent unnecessary Promise recreation.
+ * Returns a cached Promise if one exists for the given blockId, otherwise
+ * creates a new Promise and caches it.
+ */
+export const getCachedBlockReferences = (
+  blockId: string
+): Promise<BlockEntity[]> => {
+  // Check if we already have a cached promise for this block
+  const cached = blockReferencesCache.get(blockId);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  // Create a new promise and cache it
+  const promise = getAllBlockReferences(blockId);
+  blockReferencesCache.set(blockId, promise);
+
+  return promise;
 };
 
 export const loadThreadMessageBlocks = async (
@@ -641,7 +665,8 @@ export const loadThreadMessageBlocks = async (
       ),
     },
     // Lazily load block references - the promise will be resolved when the component renders
-    blockReferences: getAllBlockReferences(block.uuid),
+    // Use cached version to prevent unnecessary re-renders when block UUID hasn't changed
+    blockReferences: getCachedBlockReferences(block.uuid),
   }));
 
   return messages;

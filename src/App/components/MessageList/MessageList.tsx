@@ -464,10 +464,10 @@ export function MessageList({
         {messages.length === 0 && !isJobActive && (
           <div className="text-gray-500 text-center">Ask me anything!</div>
         )}
-        {messages.map((message, index) =>
+        {messages.map((message) =>
           message.message.role === "user" ? (
             <MemoizedUserMessage
-              key={index}
+              key={message.block.uuid}
               content={message.message.content}
               blockId={message.block.uuid || ""}
               onEdit={onEdit || (() => {})}
@@ -475,7 +475,7 @@ export function MessageList({
             />
           ) : (
             <MemoizedAssistantMessage
-              key={index}
+              key={message.block.uuid}
               blockReferences={message.blockReferences}
               content={message.message.content}
               block={message.block}

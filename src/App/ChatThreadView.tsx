@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useReducer } from "react";
+import { useState, useEffect, useMemo, useReducer, useCallback } from "react";
 import { ChatInput } from "./components/ChatInput";
 import { MessageList } from "./components/MessageList/MessageList";
 import {
@@ -180,61 +180,64 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
     }
   };
 
-  const handleEditMessage = async (blockId: string, newContent: string) => {
-    newContent = sanitizeMarkdown(newContent);
+  const handleEditMessage = useCallback(
+    async (blockId: string, newContent: string) => {
+      newContent = sanitizeMarkdown(newContent);
 
-    try {
-      // Build prior messages BEFORE forking (from the current thread)
-      // We need messages up to (but not including) the edited block
-      const priorMessages: Message[] = messages
-        .filter((m) => m.block.uuid !== blockId)
-        .map((m) => ({
-          role: m.message.role,
-          content: m.message.content,
-        })) as Message[];
+      try {
+        // Build prior messages BEFORE forking (from the current thread)
+        // We need messages up to (but not including) the edited block
+        const priorMessages: Message[] = messages
+          .filter((m) => m.block.uuid !== blockId)
+          .map((m) => ({
+            role: m.message.role,
+            content: m.message.content,
+          })) as Message[];
 
-      // Fork a new thread from the edited block
-      const newThreadId = await forkThread(blockId, pageId);
+        // Fork a new thread from the edited block
+        const newThreadId = await forkThread(blockId, pageId);
 
-      // Set the new thread as the current thread
-      await setCurrentThreadId(pageId, newThreadId);
-      setCurrentThreadIdState(newThreadId);
+        // Set the new thread as the current thread
+        await setCurrentThreadId(pageId, newThreadId);
+        setCurrentThreadIdState(newThreadId);
 
-      // Append the edited message as the root of the new thread fork
-      // This creates a new block that serves as the root with referenceId
-      // pointing to the original block (which remains for record-keeping)
-      await appendMessageToThread(
-        pageId,
-        {
+        // Append the edited message as the root of the new thread fork
+        // This creates a new block that serves as the root with referenceId
+        // pointing to the original block (which remains for record-keeping)
+        await appendMessageToThread(
+          pageId,
+          {
+            role: "user",
+            content: newContent,
+          } as Message,
+          {
+            threadId: newThreadId,
+            referenceId: blockId,
+          }
+        );
+
+        // Add the new edited message to prior messages for completion
+        priorMessages.push({
           role: "user",
           content: newContent,
-        } as Message,
-        {
-          threadId: newThreadId,
-          referenceId: blockId,
-        }
-      );
+        });
 
-      // Add the new edited message to prior messages for completion
-      priorMessages.push({
-        role: "user",
-        content: newContent,
-      });
+        // Reload messages from the new thread
+        await loadMessages();
 
-      // Reload messages from the new thread
-      await loadMessages();
-
-      // Spawn completion job for assistant reply
-      completionJobManager.runJob(pageId, () =>
-        createCompletionJob(newContent, priorMessages, pageId, {
-          threadId: newThreadId,
-        })
-      );
-    } catch (e) {
-      console.error("Error updating message:", e);
-      logseq.UI.showMsg(`Error updating message: ${e ?? ""}`, "error");
-    }
-  };
+        // Spawn completion job for assistant reply
+        completionJobManager.runJob(pageId, () =>
+          createCompletionJob(newContent, priorMessages, pageId, {
+            threadId: newThreadId,
+          })
+        );
+      } catch (e) {
+        console.error("Error updating message:", e);
+        logseq.UI.showMsg(`Error updating message: ${e ?? ""}`, "error");
+      }
+    },
+    [messages, pageId, loadMessages]
+  );
 
   return (
     <>
