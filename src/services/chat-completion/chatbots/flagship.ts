@@ -1,9 +1,8 @@
 import { z } from "zod";
 import type { Message } from "../../threading/threading";
-import { buildEnhancedMessage } from "../agent-orchestrator";
+import { buildEnhancedMessage } from "./agent-orchestrator";
 import type { Chatbot } from "../chatbot";
 import type { ChatCompletionJobEvent } from "../chat-completion-job-event";
-import type { GeneratedImage } from "../chat-completion";
 import { runCompletion } from "../chat-completion";
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateObject, streamText } from "ai";
@@ -27,7 +26,6 @@ Bear in mind, because the user would ask "what can you do", and the RAG system d
 * persisting and resuming sessions
 * retrieval-augmented generation
 * linking to pages directly from inside the threads
-* image generation
 * creating pages upon a prompt
 * invoking MCP tools
 
@@ -45,12 +43,9 @@ async function* chatThreadMessage(
   messages: Message[],
   abortSignal: AbortSignal
 ): AsyncIterable<ChatCompletionJobEvent> {
-  const imageResults: GeneratedImage[] = [];
-
   const stream = await runCompletion({
     messages: messages,
     abortSignal: abortSignal,
-    imageResults,
   });
 
   for await (const part of stream.fullStream) {
@@ -59,18 +54,6 @@ async function* chatThreadMessage(
     if (part.type === "text-delta") {
       yield { type: "text-delta", delta: part.text };
     }
-
-    // Flush any generated images as separate events
-    while (imageResults.length > 0) {
-      const image = imageResults.shift()!;
-      yield { type: "image", image };
-    }
-  }
-
-  // After streaming is done, check for any remaining images
-  while (imageResults.length > 0) {
-    const image = imageResults.shift()!;
-    yield { type: "image", image };
   }
 }
 
@@ -149,7 +132,7 @@ async function newPage(
   }
 
   const stream = await streamText({
-    model: openai("gpt-4"),
+    model: openai("gpt-4o-mini"),
     messages: [
       {
         role: "user",

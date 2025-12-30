@@ -245,7 +245,6 @@ export const getThreadByThreadId = async (
     : null;
 
   while (withReference) {
-    console.log(withReference);
     const referenceId = withReference.properties?.referenceId;
     const predecessorBlocks = await getPredecessorBlocks(referenceId, pageId);
     const blockOfReference = predecessorBlocks.find((block) => {

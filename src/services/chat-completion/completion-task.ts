@@ -9,7 +9,7 @@ import { propsToString } from "../../utils/logseq/logseq";
 import { tee3 } from "../../utils/async-iterables/tee/tee";
 import { subject } from "../../utils/subject/subject";
 import type { Job } from "../../job-manager/job-manager";
-import { flagshipChatbot } from "./chatbots/flagship";
+import { simpleChatbot } from "./chatbots/simple";
 import type {
   ChatCompletionJobEvent,
   ImageEvent,
@@ -179,7 +179,7 @@ export const createCompletionJob: (
       let hasRun = false;
 
       const [t1, t2, t3] = tee3(
-        flagshipChatbot(input, messages, abortController.signal)
+        simpleChatbot(input, messages, abortController.signal)
       );
 
       const notifyIsStreaming = () => {
