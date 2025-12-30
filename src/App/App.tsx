@@ -5,6 +5,7 @@ import { ChatHistoryView } from "./ChatHistoryView";
 import { ApiKeySetupView } from "./ApiKeySetupView";
 import { onRouteChanged } from "../services/logseq/route-change-service";
 import { IconEdit, IconHistory } from "@tabler/icons-react";
+import { debouncePromiseHandler } from "../utils/utils";
 
 type AppView =
   | { type: "CHAT_HISTORY" }
@@ -20,11 +21,11 @@ function App() {
     let isDone = false;
     const currentViewState = viewState;
 
-    const lookForPageChanges = () => {
+    const lookForPageChanges = async () => {
       if (isDone) return;
 
       if (currentViewState.type === "CHAT_THREAD") {
-        logseq.Editor.getPage(currentViewState.pageId)
+        await logseq.Editor.getPage(currentViewState.pageId)
           .then((page) => {
             if (isDone) return;
             if (!page) {
@@ -37,8 +38,11 @@ function App() {
       }
     };
 
-    const unsubscribeOnChange = logseq.DB.onChanged(lookForPageChanges);
-    const unsubscribeOnOnRouteChanged = onRouteChanged(lookForPageChanges);
+    const unsubscribeOnChange = debouncePromiseHandler(
+      logseq.DB.onChanged.bind(logseq.DB)
+    )(lookForPageChanges);
+    const unsubscribeOnOnRouteChanged =
+      debouncePromiseHandler(onRouteChanged)(lookForPageChanges);
 
     return () => {
       isDone = true;

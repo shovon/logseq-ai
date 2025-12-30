@@ -3,7 +3,11 @@ import {
   getAllChatThreads,
   type PageType,
 } from "../services/threading/threading";
-import { categorizeDateByPeriod, type TimePeriod } from "../utils/utils";
+import {
+  categorizeDateByPeriod,
+  debouncePromiseHandler,
+  type TimePeriod,
+} from "../utils/utils";
 import { onRouteChanged } from "../services/logseq/route-change-service";
 
 interface ChatHistoryViewProps {
@@ -33,13 +37,16 @@ export function ChatHistoryView({ onThreadSelect }: ChatHistoryViewProps) {
   useEffect(() => {
     let isDone = false;
 
-    const lookForPageChanges = () => {
+    const lookForPageChanges = async () => {
       if (isDone) return;
-      loadChatThreads();
+      await loadChatThreads();
     };
 
-    const unsubscribeOnChange = logseq.DB.onChanged(lookForPageChanges);
-    const unsubscribeOnOnRouteChanged = onRouteChanged(lookForPageChanges);
+    const unsubscribeOnChange = debouncePromiseHandler(
+      logseq.DB.onChanged.bind(logseq.DB)
+    )(lookForPageChanges);
+    const unsubscribeOnOnRouteChanged =
+      debouncePromiseHandler(onRouteChanged)(lookForPageChanges);
 
     return () => {
       isDone = true;

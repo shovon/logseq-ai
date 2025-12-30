@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback, useMemo, memo } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
@@ -24,6 +24,10 @@ interface MessageListProps {
 const urlTransform = (url: string) => {
   return url.startsWith("data:") ? url : defaultUrlTransform(url);
 };
+
+// Module-level plugin arrays to prevent ReactMarkdown re-initialization
+const remarkPlugins = [remarkMath, remarkLogseqPageRefs];
+const rehypePlugins = [rehypeKatex];
 
 // Shared markdown component configuration for handling Logseq page references
 const markdownComponents: Components = {
@@ -107,20 +111,41 @@ interface AssistantMessageProps extends MessageContentProps {
   block: BlockEntity;
 
   // TODO: move this to `MessageContentProps`
-  refCount: number;
+  blockReferences: Promise<BlockEntity[]>;
 }
 
 interface UserMessageProps extends MessageContentProps {
   blockId: string;
   onEdit: (blockId: string, newContent: string) => void;
-  refCount: number;
+  blockReferences: Promise<BlockEntity[]>;
 }
 
 // User message component for user prompts
-function UserMessage({ content, blockId, onEdit, refCount }: UserMessageProps) {
+function UserMessage({
+  content,
+  blockId,
+  onEdit,
+  blockReferences,
+}: UserMessageProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(content);
   const [isHovered, setIsHovered] = useState(false);
+  const [refCount, setRefCount] = useState<number | null>(null);
+
+  // Memoize processed markdown content to prevent re-parsing
+  const processedContent = useMemo(
+    () => sanitizeMarkdownHeadersToRfcBullets(filterPropertyLines(content)),
+    [content]
+  );
+
+  // Lazily load block references count
+  useEffect(() => {
+    blockReferences
+      .then((refs) => setRefCount(refs.length))
+      .catch(() => {
+        setRefCount(0);
+      });
+  }, [blockReferences]);
 
   // Sync editedContent when content prop changes (e.g., after external update)
   useEffect(() => {
@@ -188,15 +213,15 @@ function UserMessage({ content, blockId, onEdit, refCount }: UserMessageProps) {
         <div className={proseClasses}>
           <ReactMarkdown
             urlTransform={urlTransform}
-            remarkPlugins={[remarkMath, remarkLogseqPageRefs]}
-            rehypePlugins={[rehypeKatex]}
+            remarkPlugins={remarkPlugins}
+            rehypePlugins={rehypePlugins}
             components={markdownComponents}
           >
-            {sanitizeMarkdownHeadersToRfcBullets(filterPropertyLines(content))}
+            {processedContent}
           </ReactMarkdown>
         </div>
       </div>
-      {refCount > 0 && (
+      {refCount !== null && refCount > 0 && (
         <div className="flex-shrink-0 mt-1">
           <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-2 text-xs font-medium rounded-full bg-gray-200 dark:bg-logseq-cyan-low-saturation-800 text-gray-700 dark:text-logseq-cyan-low-saturation-300">
             {refCount}
@@ -208,20 +233,40 @@ function UserMessage({ content, blockId, onEdit, refCount }: UserMessageProps) {
 }
 
 // Assistant message component for assistant responses
-function AssistantMessage({ content, block, refCount }: AssistantMessageProps) {
+function AssistantMessage({
+  content,
+  block,
+  blockReferences,
+}: AssistantMessageProps) {
   const isFailed = block.properties?.status === "failed";
+  const [refCount, setRefCount] = useState<number | null>(null);
+
+  // Memoize processed markdown content to prevent re-parsing
+  const processedContent = useMemo(
+    () => sanitizeMarkdownHeadersToRfcBullets(filterPropertyLines(content)),
+    [content]
+  );
+
+  // Lazily load block references count
+  useEffect(() => {
+    blockReferences
+      .then((refs) => setRefCount(refs.length))
+      .catch(() => {
+        setRefCount(0);
+      });
+  }, [blockReferences]);
 
   return (
     <div className="rounded-lg flex items-start gap-3">
       <div className="flex-1 min-w-0">
         <div className={proseClasses}>
           <ReactMarkdown
-            remarkPlugins={[remarkMath, remarkLogseqPageRefs]}
-            rehypePlugins={[rehypeKatex]}
+            remarkPlugins={remarkPlugins}
+            rehypePlugins={rehypePlugins}
             components={markdownComponents}
             urlTransform={urlTransform}
           >
-            {sanitizeMarkdownHeadersToRfcBullets(filterPropertyLines(content))}
+            {processedContent}
           </ReactMarkdown>
         </div>
         {isFailed && (
@@ -233,7 +278,7 @@ function AssistantMessage({ content, block, refCount }: AssistantMessageProps) {
           </div>
         )}
       </div>
-      {refCount > 0 && (
+      {refCount !== null && refCount > 0 && (
         <div className="flex-shrink-0 mt-1">
           <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-2 text-xs font-medium rounded-full bg-gray-200 dark:bg-logseq-cyan-low-saturation-800 text-gray-700 dark:text-logseq-cyan-low-saturation-300">
             {refCount}
@@ -243,6 +288,28 @@ function AssistantMessage({ content, block, refCount }: AssistantMessageProps) {
     </div>
   );
 }
+
+// Memoized UserMessage component to prevent unnecessary re-renders
+const MemoizedUserMessage = memo(UserMessage, (prevProps, nextProps) => {
+  return (
+    prevProps.content === nextProps.content &&
+    prevProps.blockId === nextProps.blockId &&
+    prevProps.onEdit === nextProps.onEdit &&
+    prevProps.blockReferences === nextProps.blockReferences
+  );
+});
+
+// Memoized AssistantMessage component to prevent unnecessary re-renders
+const MemoizedAssistantMessage = memo(
+  AssistantMessage,
+  (prevProps, nextProps) => {
+    return (
+      prevProps.content === nextProps.content &&
+      prevProps.block === nextProps.block &&
+      prevProps.blockReferences === nextProps.blockReferences
+    );
+  }
+);
 
 interface TextCarouselProps {
   phrases: string[];
@@ -399,17 +466,17 @@ export function MessageList({
         )}
         {messages.map((message, index) =>
           message.message.role === "user" ? (
-            <UserMessage
+            <MemoizedUserMessage
               key={index}
               content={message.message.content}
               blockId={message.block.uuid || ""}
               onEdit={onEdit || (() => {})}
-              refCount={message.blockReferences.length}
+              blockReferences={message.blockReferences}
             />
           ) : (
-            <AssistantMessage
+            <MemoizedAssistantMessage
               key={index}
-              refCount={message.blockReferences.length}
+              blockReferences={message.blockReferences}
               content={message.message.content}
               block={message.block}
             />
