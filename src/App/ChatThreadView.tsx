@@ -13,7 +13,7 @@ import {
 } from "../services/threading/threading";
 import { completionJobManager } from "../services/chat-completion/completion-job-manager";
 import { createCompletionJob } from "../services/chat-completion/completion-task";
-import { sanitizeMarkdown } from "../utils/utils";
+import { debouncePromiseHandler, sanitizeMarkdown } from "../utils/utils";
 
 interface ChatThreadViewProps {
   pageId: string;
@@ -127,7 +127,11 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
     [pageId]
   );
 
-  useEffect(() => logseq.DB.onChanged(loadMessages), [loadMessages]);
+  useEffect(() => {
+    return debouncePromiseHandler(logseq.DB.onChanged.bind(logseq.DB))(
+      loadMessages
+    );
+  }, [loadMessages]);
   useEffect(() => {
     loadMessages();
   }, [loadMessages]);
