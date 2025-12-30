@@ -102,7 +102,7 @@ export type Message = {
 export type BlockMessage = {
   message: Message;
   block: BlockEntity;
-  blockReferences: BlockEntity[];
+  blockReferences: Promise<BlockEntity[]>;
 };
 
 export type ThreadMetadata = {
@@ -632,26 +632,17 @@ export const loadThreadMessageBlocks = async (
   );
 
   // Convert blocks to Message objects, preserving order
-  const messages: BlockMessage[] = await Promise.all(
-    messageBlocks.map(async (block) => ({
-      block,
-      message: {
-        role: Role.exclude(["system"]).parse(block.properties!.role),
-        content: sanitizeMarkdownHeadersToRfcBullets(
-          filterPropertyLines(block.content)
-        ),
-      },
-
-      // TODO: perhaps lazily load this instead. Problem with this approach is
-      //   that we risk with having to revalidate stale data somehow (likely
-      //   by adding some listener at the component level).
-      //
-      //   Why lazy-load? It's because we want to have thread messages load up
-      //   much faster; defer the loading of the count until component is
-      //   rendered.
-      blockReferences: await getAllBlockReferences(block.uuid),
-    }))
-  );
+  const messages: BlockMessage[] = messageBlocks.map((block) => ({
+    block,
+    message: {
+      role: Role.exclude(["system"]).parse(block.properties!.role),
+      content: sanitizeMarkdownHeadersToRfcBullets(
+        filterPropertyLines(block.content)
+      ),
+    },
+    // Lazily load block references - the promise will be resolved when the component renders
+    blockReferences: getAllBlockReferences(block.uuid),
+  }));
 
   return messages;
 };

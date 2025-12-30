@@ -212,3 +212,47 @@ export function categorizeDateByPeriod(date: Date): TimePeriod {
     return "older";
   }
 }
+
+export const debouncePromiseHandler = <T>(
+  emitter: (listener: (value: T) => void) => () => void
+): ((listener: (value: T) => Promise<void>) => () => void) => {
+  let pendingPromise: Promise<void> | null = null;
+  let queuedEvent: T | null = null;
+  let userListener: ((value: T) => Promise<void>) | null = null;
+  let unsubscribe: (() => void) | null = null;
+
+  const processEvent = async (value: T) => {
+    if (!userListener) return;
+
+    if (pendingPromise === null) {
+      // No promise pending, execute immediately
+      pendingPromise = userListener(value);
+      await pendingPromise;
+      pendingPromise = null;
+
+      // Check if there's a queued event to process
+      if (queuedEvent !== null) {
+        const nextEvent = queuedEvent;
+        queuedEvent = null;
+        await processEvent(nextEvent);
+      }
+    } else {
+      // Promise pending, queue the event (replacing any existing queued event)
+      queuedEvent = value;
+    }
+  };
+
+  return (listener) => {
+    userListener = listener;
+    unsubscribe = emitter(processEvent);
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+        unsubscribe = null;
+      }
+      userListener = null;
+      pendingPromise = null;
+      queuedEvent = null;
+    };
+  };
+};
