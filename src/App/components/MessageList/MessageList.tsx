@@ -107,20 +107,33 @@ interface AssistantMessageProps extends MessageContentProps {
   block: BlockEntity;
 
   // TODO: move this to `MessageContentProps`
-  refCount: number;
+  blockReferences: Promise<BlockEntity[]>;
 }
 
 interface UserMessageProps extends MessageContentProps {
   blockId: string;
   onEdit: (blockId: string, newContent: string) => void;
-  refCount: number;
+  blockReferences: Promise<BlockEntity[]>;
 }
 
 // User message component for user prompts
-function UserMessage({ content, blockId, onEdit, refCount }: UserMessageProps) {
+function UserMessage({
+  content,
+  blockId,
+  onEdit,
+  blockReferences,
+}: UserMessageProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(content);
   const [isHovered, setIsHovered] = useState(false);
+  const [refCount, setRefCount] = useState<number | null>(null);
+
+  // Lazily load block references count
+  useEffect(() => {
+    blockReferences.then((refs) => setRefCount(refs.length)).catch(() => {
+      setRefCount(0);
+    });
+  }, [blockReferences]);
 
   // Sync editedContent when content prop changes (e.g., after external update)
   useEffect(() => {
@@ -196,7 +209,7 @@ function UserMessage({ content, blockId, onEdit, refCount }: UserMessageProps) {
           </ReactMarkdown>
         </div>
       </div>
-      {refCount > 0 && (
+      {refCount !== null && refCount > 0 && (
         <div className="flex-shrink-0 mt-1">
           <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-2 text-xs font-medium rounded-full bg-gray-200 dark:bg-logseq-cyan-low-saturation-800 text-gray-700 dark:text-logseq-cyan-low-saturation-300">
             {refCount}
@@ -208,8 +221,20 @@ function UserMessage({ content, blockId, onEdit, refCount }: UserMessageProps) {
 }
 
 // Assistant message component for assistant responses
-function AssistantMessage({ content, block, refCount }: AssistantMessageProps) {
+function AssistantMessage({
+  content,
+  block,
+  blockReferences,
+}: AssistantMessageProps) {
   const isFailed = block.properties?.status === "failed";
+  const [refCount, setRefCount] = useState<number | null>(null);
+
+  // Lazily load block references count
+  useEffect(() => {
+    blockReferences.then((refs) => setRefCount(refs.length)).catch(() => {
+      setRefCount(0);
+    });
+  }, [blockReferences]);
 
   return (
     <div className="rounded-lg flex items-start gap-3">
@@ -233,7 +258,7 @@ function AssistantMessage({ content, block, refCount }: AssistantMessageProps) {
           </div>
         )}
       </div>
-      {refCount > 0 && (
+      {refCount !== null && refCount > 0 && (
         <div className="flex-shrink-0 mt-1">
           <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-2 text-xs font-medium rounded-full bg-gray-200 dark:bg-logseq-cyan-low-saturation-800 text-gray-700 dark:text-logseq-cyan-low-saturation-300">
             {refCount}
@@ -404,12 +429,12 @@ export function MessageList({
               content={message.message.content}
               blockId={message.block.uuid || ""}
               onEdit={onEdit || (() => {})}
-              refCount={message.blockReferences.length}
+              blockReferences={message.blockReferences}
             />
           ) : (
             <AssistantMessage
               key={index}
-              refCount={message.blockReferences.length}
+              blockReferences={message.blockReferences}
               content={message.message.content}
               block={message.block}
             />
