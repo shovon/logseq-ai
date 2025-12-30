@@ -6,9 +6,7 @@ import { createChatThreadPage, type Message } from "./threading/threading";
 
 export const appendMessageToThread = async (
   pageUuid: string,
-  role: Role
-  message: Message,
-  rootThreadUuid?: string
+  message: Message
 ): Promise<void> => {
   await logseq.Editor.appendBlockInPage(pageUuid, message.content, {
     properties: { role: message.role },

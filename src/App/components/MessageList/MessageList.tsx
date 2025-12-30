@@ -13,6 +13,7 @@ import type { Components } from "react-markdown";
 import { remarkLogseqPageRefs } from "./remark-logseq-page-refs";
 import { IconPencil, IconAlertTriangle } from "@tabler/icons-react";
 import { BeatLoader } from "react-spinners";
+import { useVirtualizer } from "@tanstack/react-virtual";
 
 interface MessageListProps {
   messages: BlockMessage[];
@@ -391,22 +392,40 @@ export function MessageList({
 }: MessageListProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isUserAtBottom, setIsUserAtBottom] = useState<boolean>(true);
+  const isUserAtBottomRef = useRef<boolean>(true);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    isUserAtBottomRef.current = isUserAtBottom;
+  }, [isUserAtBottom]);
+
+  // Initialize the virtualizer
+  const virtualizer = useVirtualizer({
+    count: messages.length + (isJobActive && !isStreaming ? 1 : 0), // +1 for thinking indicator
+    getScrollElement: () => scrollContainerRef.current,
+    estimateSize: () => 150, // Estimate average message height
+    overscan: 5, // Keep 5 items rendered above/below viewport for smooth scrolling
+  });
 
   // Check if user is scrolled to bottom
   const checkIfAtBottom = () => {
     if (!scrollContainerRef.current) return false;
     const { scrollTop, scrollHeight, clientHeight } =
       scrollContainerRef.current;
-    return scrollHeight - scrollTop - clientHeight < 10; // 10px threshold
+    return scrollHeight - scrollTop - clientHeight < 50; // Increased threshold for better UX
   };
 
-  // Auto-scroll to bottom if user was already at bottom
+  // Auto-scroll to bottom using direct DOM manipulation
   const scrollToBottom = useCallback(() => {
-    if (scrollContainerRef.current && isUserAtBottom) {
-      scrollContainerRef.current.scrollTop =
-        scrollContainerRef.current.scrollHeight;
-    }
-  }, [isUserAtBottom]);
+    if (!scrollContainerRef.current || !isUserAtBottomRef.current) return;
+
+    // Use requestAnimationFrame to ensure DOM has updated
+    requestAnimationFrame(() => {
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+      }
+    });
+  }, []);
 
   // Handle scroll events to track if user is at bottom
   const handleScroll = () => {
@@ -423,36 +442,31 @@ export function MessageList({
     scrollToBottom();
   }, [isJobActive, scrollToBottom]);
 
-  // Auto-scroll when content changes (e.g., during streaming)
+  // Monitor content changes during streaming for auto-scroll
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    // Track previous scrollHeight to detect changes
-    let lastScrollHeight = container.scrollHeight;
-
-    const mutationObserver = new MutationObserver(() => {
-      // Check if scrollHeight changed
-      if (container.scrollHeight !== lastScrollHeight) {
-        lastScrollHeight = container.scrollHeight;
-        // Only scroll if user was already at bottom
-        if (isUserAtBottom) {
-          scrollToBottom();
-        }
+    // Use ResizeObserver to detect when content size changes
+    const resizeObserver = new ResizeObserver(() => {
+      if (isUserAtBottomRef.current) {
+        scrollToBottom();
       }
     });
 
-    // Observe changes to child elements (content additions/modifications)
-    mutationObserver.observe(container, {
-      childList: true,
-      subtree: true,
-      characterData: true,
-    });
+    // Observe the inner content div
+    const innerDiv = container.firstElementChild as HTMLElement;
+    if (innerDiv) {
+      resizeObserver.observe(innerDiv);
+    }
 
     return () => {
-      mutationObserver.disconnect();
+      resizeObserver.disconnect();
     };
-  }, [isUserAtBottom, scrollToBottom]);
+  }, [scrollToBottom]);
+
+  // Get virtual items
+  const virtualItems = virtualizer.getVirtualItems();
 
   return (
     <div
@@ -460,29 +474,73 @@ export function MessageList({
       onScroll={handleScroll}
       className="flex-1 overflow-auto py-6 pb-4"
     >
-      <div className="px-4 space-y-4">
+      <div
+        style={{
+          height: `${virtualizer.getTotalSize()}px`,
+          width: '100%',
+          position: 'relative',
+        }}
+      >
         {messages.length === 0 && !isJobActive && (
           <div className="text-gray-500 text-center">Ask me anything!</div>
         )}
-        {messages.map((message) =>
-          message.message.role === "user" ? (
-            <MemoizedUserMessage
+        {virtualItems.map((virtualItem) => {
+          const isThinkingIndicator = virtualItem.index === messages.length;
+
+          if (isThinkingIndicator) {
+            return (
+              <div
+                key="thinking-indicator"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  transform: `translateY(${virtualItem.start}px)`,
+                }}
+              >
+                <div className="px-4 py-2">
+                  <ThinkingIndicator />
+                </div>
+              </div>
+            );
+          }
+
+          const message = messages[virtualItem.index];
+          if (!message) return null;
+
+          return (
+            <div
               key={message.block.uuid}
-              content={message.message.content}
-              blockId={message.block.uuid || ""}
-              onEdit={onEdit || (() => {})}
-              blockReferences={message.blockReferences}
-            />
-          ) : (
-            <MemoizedAssistantMessage
-              key={message.block.uuid}
-              blockReferences={message.blockReferences}
-              content={message.message.content}
-              block={message.block}
-            />
-          )
-        )}
-        {isJobActive && !isStreaming && <ThinkingIndicator />}
+              data-index={virtualItem.index}
+              ref={virtualizer.measureElement}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${virtualItem.start}px)`,
+              }}
+            >
+              <div className="px-4 py-2">
+                {message.message.role === "user" ? (
+                  <MemoizedUserMessage
+                    content={message.message.content}
+                    blockId={message.block.uuid || ""}
+                    onEdit={onEdit || (() => {})}
+                    blockReferences={message.blockReferences}
+                  />
+                ) : (
+                  <MemoizedAssistantMessage
+                    blockReferences={message.blockReferences}
+                    content={message.message.content}
+                    block={message.block}
+                  />
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
