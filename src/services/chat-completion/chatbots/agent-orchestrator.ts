@@ -3,13 +3,13 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { buildPageContext } from "./context-builder";
-import { generateEmbedding } from "../embedding/embedding";
-import { vectorSearch } from "../embedding/db";
+import { buildPageContext } from "../context-builder";
+import { generateEmbedding } from "../../embedding/embedding";
+import { vectorSearch } from "../../embedding/db";
 import {
   filterPropertyLines,
   sanitizeMarkdownHeadersToRfcBullets,
-} from "../../utils/utils";
+} from "../../../utils/utils";
 
 /**
  * Detects user intent from their message
