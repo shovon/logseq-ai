@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback, useMemo, memo } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
@@ -24,6 +24,10 @@ interface MessageListProps {
 const urlTransform = (url: string) => {
   return url.startsWith("data:") ? url : defaultUrlTransform(url);
 };
+
+// Module-level plugin arrays to prevent ReactMarkdown re-initialization
+const remarkPlugins = [remarkMath, remarkLogseqPageRefs];
+const rehypePlugins = [rehypeKatex];
 
 // Shared markdown component configuration for handling Logseq page references
 const markdownComponents: Components = {
@@ -128,6 +132,12 @@ function UserMessage({
   const [isHovered, setIsHovered] = useState(false);
   const [refCount, setRefCount] = useState<number | null>(null);
 
+  // Memoize processed markdown content to prevent re-parsing
+  const processedContent = useMemo(
+    () => sanitizeMarkdownHeadersToRfcBullets(filterPropertyLines(content)),
+    [content]
+  );
+
   // Lazily load block references count
   useEffect(() => {
     blockReferences
@@ -203,11 +213,11 @@ function UserMessage({
         <div className={proseClasses}>
           <ReactMarkdown
             urlTransform={urlTransform}
-            remarkPlugins={[remarkMath, remarkLogseqPageRefs]}
-            rehypePlugins={[rehypeKatex]}
+            remarkPlugins={remarkPlugins}
+            rehypePlugins={rehypePlugins}
             components={markdownComponents}
           >
-            {sanitizeMarkdownHeadersToRfcBullets(filterPropertyLines(content))}
+            {processedContent}
           </ReactMarkdown>
         </div>
       </div>
@@ -231,6 +241,12 @@ function AssistantMessage({
   const isFailed = block.properties?.status === "failed";
   const [refCount, setRefCount] = useState<number | null>(null);
 
+  // Memoize processed markdown content to prevent re-parsing
+  const processedContent = useMemo(
+    () => sanitizeMarkdownHeadersToRfcBullets(filterPropertyLines(content)),
+    [content]
+  );
+
   // Lazily load block references count
   useEffect(() => {
     blockReferences
@@ -245,12 +261,12 @@ function AssistantMessage({
       <div className="flex-1 min-w-0">
         <div className={proseClasses}>
           <ReactMarkdown
-            remarkPlugins={[remarkMath, remarkLogseqPageRefs]}
-            rehypePlugins={[rehypeKatex]}
+            remarkPlugins={remarkPlugins}
+            rehypePlugins={rehypePlugins}
             components={markdownComponents}
             urlTransform={urlTransform}
           >
-            {sanitizeMarkdownHeadersToRfcBullets(filterPropertyLines(content))}
+            {processedContent}
           </ReactMarkdown>
         </div>
         {isFailed && (
@@ -272,6 +288,28 @@ function AssistantMessage({
     </div>
   );
 }
+
+// Memoized UserMessage component to prevent unnecessary re-renders
+const MemoizedUserMessage = memo(UserMessage, (prevProps, nextProps) => {
+  return (
+    prevProps.content === nextProps.content &&
+    prevProps.blockId === nextProps.blockId &&
+    prevProps.onEdit === nextProps.onEdit &&
+    prevProps.blockReferences === nextProps.blockReferences
+  );
+});
+
+// Memoized AssistantMessage component to prevent unnecessary re-renders
+const MemoizedAssistantMessage = memo(
+  AssistantMessage,
+  (prevProps, nextProps) => {
+    return (
+      prevProps.content === nextProps.content &&
+      prevProps.block === nextProps.block &&
+      prevProps.blockReferences === nextProps.blockReferences
+    );
+  }
+);
 
 interface TextCarouselProps {
   phrases: string[];
@@ -428,7 +466,7 @@ export function MessageList({
         )}
         {messages.map((message, index) =>
           message.message.role === "user" ? (
-            <UserMessage
+            <MemoizedUserMessage
               key={index}
               content={message.message.content}
               blockId={message.block.uuid || ""}
@@ -436,7 +474,7 @@ export function MessageList({
               blockReferences={message.blockReferences}
             />
           ) : (
-            <AssistantMessage
+            <MemoizedAssistantMessage
               key={index}
               blockReferences={message.blockReferences}
               content={message.message.content}
