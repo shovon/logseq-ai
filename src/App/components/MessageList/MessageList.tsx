@@ -130,9 +130,11 @@ function UserMessage({
 
   // Lazily load block references count
   useEffect(() => {
-    blockReferences.then((refs) => setRefCount(refs.length)).catch(() => {
-      setRefCount(0);
-    });
+    blockReferences
+      .then((refs) => setRefCount(refs.length))
+      .catch(() => {
+        setRefCount(0);
+      });
   }, [blockReferences]);
 
   // Sync editedContent when content prop changes (e.g., after external update)
@@ -231,9 +233,11 @@ function AssistantMessage({
 
   // Lazily load block references count
   useEffect(() => {
-    blockReferences.then((refs) => setRefCount(refs.length)).catch(() => {
-      setRefCount(0);
-    });
+    blockReferences
+      .then((refs) => setRefCount(refs.length))
+      .catch(() => {
+        setRefCount(0);
+      });
   }, [blockReferences]);
 
   return (

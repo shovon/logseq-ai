@@ -236,8 +236,6 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
     }
   };
 
-  console.log("Is streaming", isStreaming);
-
   return (
     <>
       <MessageList
