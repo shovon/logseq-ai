@@ -9,6 +9,7 @@ import { indexAllEmbeddings } from "./services/embedding/indexer.ts";
 import { onRouteChanged } from "./services/logseq/route-change-service.ts";
 import { loadMCPServers } from "./services/chat-completion/mcp.ts";
 import { Hub } from "./job-manager/examples/hub.tsx";
+import { debouncePromiseHandler } from "./utils/utils.ts";
 
 function debounce(callback: () => unknown, delay: number) {
   let timer: ReturnType<typeof setTimeout>;
@@ -42,15 +43,14 @@ const main = async () => {
 
   initializeSidebarStuff();
 
-  const debouncedIndex = debounce(indexAllEmbeddings, 1000);
-
-  const debouncedIndexing = () => {
-    debouncedIndex();
+  const runIndexing = async () => {
+    await indexAllEmbeddings();
   };
 
-  logseq.DB.onChanged(debouncedIndexing);
-  onRouteChanged(debouncedIndexing);
-
+  // TODO: this really doesn't stop all 3 from firing `runIndexing` at once.
+  //   Gotta fix this.
+  debouncePromiseHandler(logseq.DB.onChanged.bind(logseq.DB))(runIndexing);
+  debouncePromiseHandler(onRouteChanged)(runIndexing);
   indexAllEmbeddings();
 
   loadMCPServers();
