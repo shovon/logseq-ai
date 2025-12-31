@@ -7,7 +7,7 @@ A Logseq plugin that adds AI assistance to enhance your note-taking and knowledg
 ## Discussion
 
 - [Thread on Discord about Logseq AI Plugin](https://discord.com/channels/725182569297215569/1442982882196062441)
-- [Discussion forum on GitHub]()
+- [Discussion forum on GitHub](https://github.com/shovon/logseq-ai/discussions)
 
 ## Overview
 
