@@ -103,6 +103,7 @@ export type BlockMessage = {
   message: Message;
   block: BlockEntity;
   blockReferences: Promise<BlockEntity[]>;
+  threadBlocks: Promise<BlockEntity[]>;
 };
 
 export type ThreadMetadata = {
@@ -501,8 +502,9 @@ const getAllDescendantUuids = (
 
 /**
  * Finds all blocks that reference a given block or any of its descendants.
- * A block references another block if its `referenceId` or `reference-id` property
- * (parsed from `((UUID))` format) matches the target block's UUID or any descendant UUID.
+ * A block references another block if its `referenceId` or `reference-id`
+ * property (parsed from `((UUID))` format) matches the target block's UUID or
+ * any descendant UUID.
  */
 export const getBlocksReferencing = async (
   blockId: string,
@@ -573,6 +575,147 @@ export const getBlocksReferencing = async (
   }
 
   return referencingBlocks;
+};
+
+/**
+ * Extracts and parses the reference-id from a block's properties.
+ * Handles both camelCase (referenceId) and kebab-case (reference-id) property names.
+ * Returns the parsed UUID or undefined if not found/invalid.
+ */
+const extractReferenceId = (block: BlockEntity): string | undefined => {
+  const props = block.properties;
+  if (!props) {
+    return undefined;
+  }
+
+  // Check both camelCase and kebab-case property names
+  const referenceIdValue =
+    typeof props.referenceId === "string"
+      ? props.referenceId
+      : typeof props["reference-id"] === "string"
+        ? props["reference-id"]
+        : undefined;
+
+  if (!referenceIdValue) {
+    return undefined;
+  }
+
+  // Parse the reference (handles both ((UUID)) and plain UUID formats)
+  return parseBlockReference(referenceIdValue);
+};
+
+/**
+ * Builds a bidirectional adjacency map from reference-id relationships.
+ * Returns a map where each block UUID maps to a Set of connected block UUIDs.
+ */
+const buildReferenceGraph = (
+  allBlocks: BlockEntity[]
+): Map<string, Set<string>> => {
+  const graph = new Map<string, Set<string>>();
+
+  // Initialize graph with all block UUIDs
+  for (const block of allBlocks) {
+    graph.set(block.uuid, new Set<string>());
+  }
+
+  // Build bidirectional edges from reference-id relationships
+  for (const block of allBlocks) {
+    const referencedId = extractReferenceId(block);
+    if (!referencedId) {
+      continue;
+    }
+
+    // Only add edge if the referenced block exists in our block set
+    if (graph.has(referencedId)) {
+      // Forward edge: block -> referencedId
+      graph.get(block.uuid)!.add(referencedId);
+      // Reverse edge: referencedId -> block (bidirectional)
+      graph.get(referencedId)!.add(block.uuid);
+    }
+  }
+
+  return graph;
+};
+
+/**
+ * Finds all blocks connected to a given block through reference-id relationships.
+ * Traverses the graph bidirectionally to build a connected component.
+ * Returns all connected blocks including the target block itself.
+ */
+export const getConnectedBlocksByReference = async (
+  blockId: string,
+  pageId: string
+): Promise<BlockEntity[]> => {
+  // Validate that the target block exists and belongs to the page
+  const targetBlock = await logseq.Editor.getBlock(blockId);
+  if (!targetBlock) {
+    throw new Error(`Block with id ${blockId} not found`);
+  }
+
+  // Validate page
+  const page = await logseq.Editor.getPage(pageId);
+  if (!page) {
+    throw new Error(`Page with id ${pageId} not found`);
+  }
+
+  // Guardrail: Validate that the block belongs to the specified pageId
+  const blockPageId =
+    targetBlock.page?.uuid || String(targetBlock.page?.id || "");
+  if (page.id !== targetBlock.page?.id) {
+    throw new Error(
+      `Block ${blockId} does not belong to page ${pageId}. ` +
+        `Block belongs to page ${blockPageId || "unknown"}`
+    );
+  }
+
+  // Get all blocks from the page
+  const allBlocks =
+    ((await logseq.Editor.getPageBlocksTree(
+      pageId
+    )) as Array<BlockEntity> | null) ?? [];
+
+  // Build bidirectional reference graph
+  const graph = buildReferenceGraph(allBlocks);
+
+  // Create a block UUID to BlockEntity map for quick lookup
+  const blockMap = new Map<string, BlockEntity>();
+  for (const block of allBlocks) {
+    blockMap.set(block.uuid, block);
+  }
+
+  // Traverse connected component using BFS
+  const connectedBlocks: BlockEntity[] = [];
+  const visited = new Set<string>();
+  const queue: string[] = [blockId];
+
+  while (queue.length > 0) {
+    const currentId = queue.shift()!;
+
+    // Skip if already visited (guard against cycles)
+    if (visited.has(currentId)) {
+      continue;
+    }
+
+    visited.add(currentId);
+
+    // Add current block to results if it exists in our block set
+    const currentBlock = blockMap.get(currentId);
+    if (currentBlock) {
+      connectedBlocks.push(currentBlock);
+    }
+
+    // Add all connected blocks to the queue
+    const neighbors = graph.get(currentId);
+    if (neighbors) {
+      for (const neighborId of neighbors) {
+        if (!visited.has(neighborId)) {
+          queue.push(neighborId);
+        }
+      }
+    }
+  }
+
+  return connectedBlocks;
 };
 
 /**
@@ -740,6 +883,10 @@ export const getAllChatThreads = async (): Promise<PageType[]> => {
 // Cache for block references promises to prevent unnecessary re-fetching
 const blockReferencesCache = new Map<string, Promise<BlockEntity[]>>();
 
+// Cache for thread blocks promises to prevent unnecessary re-fetching
+// Key format: `${blockId}:${pageId}`
+const threadBlocksCache = new Map<string, Promise<BlockEntity[]>>();
+
 export const getAllBlockReferences = async (
   blockId: string
 ): Promise<BlockEntity[]> => {
@@ -789,6 +936,31 @@ export const getCachedBlockReferences = (
   return promise;
 };
 
+/**
+ * Gets thread blocks (connected blocks by reference-id) with caching to prevent
+ * unnecessary Promise recreation. Returns a cached Promise if one exists for the
+ * given blockId and pageId combination, otherwise creates a new Promise and caches it.
+ */
+export const getCachedThreadBlocks = (
+  blockId: string,
+  pageId: string
+): Promise<BlockEntity[]> => {
+  // Create cache key from blockId and pageId
+  const cacheKey = `${blockId}:${pageId}`;
+
+  // Check if we already have a cached promise for this block/page combination
+  const cached = threadBlocksCache.get(cacheKey);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  // Create a new promise and cache it
+  const promise = getConnectedBlocksByReference(blockId, pageId);
+  threadBlocksCache.set(cacheKey, promise);
+
+  return promise;
+};
+
 export const loadThreadMessageBlocks = async (
   pageUuid: string,
   threadId?: string | null
@@ -827,6 +999,9 @@ export const loadThreadMessageBlocks = async (
     // Lazily load block references - the promise will be resolved when the component renders
     // Use cached version to prevent unnecessary re-renders when block UUID hasn't changed
     blockReferences: getCachedBlockReferences(block.uuid),
+    // Lazily load thread blocks (connected blocks by reference-id) - the promise will be resolved when the component renders
+    // Use cached version to prevent unnecessary re-renders when block UUID and page UUID haven't changed
+    threadBlocks: getCachedThreadBlocks(block.uuid, pageUuid),
   }));
 
   return messages;
