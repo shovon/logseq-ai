@@ -185,10 +185,19 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
       newContent = sanitizeMarkdown(newContent);
 
       try {
+        // Find the index of the edited block
+        const editedBlockIndex = messages.findIndex(
+          (m) => m.block.uuid === blockId
+        );
+
+        if (editedBlockIndex === -1) {
+          throw new Error(`Block with id ${blockId} not found in messages`);
+        }
+
         // Build prior messages BEFORE forking (from the current thread)
         // We need messages up to (but not including) the edited block
         const priorMessages: Message[] = messages
-          .filter((m) => m.block.uuid !== blockId)
+          .slice(0, editedBlockIndex) // Only messages before the edited one
           .map((m) => ({
             role: m.message.role,
             content: m.message.content,

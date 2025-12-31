@@ -113,12 +113,14 @@ interface AssistantMessageProps extends MessageContentProps {
 
   // TODO: move this to `MessageContentProps`
   blockReferences: Promise<BlockEntity[]>;
+  threadBlocks: Promise<BlockEntity[]>;
 }
 
 interface UserMessageProps extends MessageContentProps {
   blockId: string;
   onEdit: (blockId: string, newContent: string) => void;
   blockReferences: Promise<BlockEntity[]>;
+  threadBlocks: Promise<BlockEntity[]>;
 }
 
 // User message component for user prompts
@@ -127,11 +129,13 @@ function UserMessage({
   blockId,
   onEdit,
   blockReferences,
+  threadBlocks,
 }: UserMessageProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(content);
   const [isHovered, setIsHovered] = useState(false);
   const [refCount, setRefCount] = useState<number | null>(null);
+  const [threadBlockUuids, setThreadBlockUuids] = useState<string[]>([]);
 
   // Memoize processed markdown content to prevent re-parsing
   const processedContent = useMemo(
@@ -147,6 +151,20 @@ function UserMessage({
         setRefCount(0);
       });
   }, [blockReferences]);
+
+  // Lazily load thread blocks and extract UUIDs (excluding current block)
+  useEffect(() => {
+    threadBlocks
+      .then((blocks) => {
+        const uuids = blocks
+          .map((b) => b.uuid)
+          .filter((uuid) => uuid !== blockId);
+        setThreadBlockUuids(uuids);
+      })
+      .catch(() => {
+        setThreadBlockUuids([]);
+      });
+  }, [threadBlocks, blockId]);
 
   // Sync editedContent when content prop changes (e.g., after external update)
   useEffect(() => {
@@ -221,6 +239,13 @@ function UserMessage({
             {processedContent}
           </ReactMarkdown>
         </div>
+        {threadBlockUuids.length > 0 && (
+          <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              Alternative threads: {threadBlockUuids.join(", ")}
+            </div>
+          </div>
+        )}
       </div>
       {refCount !== null && refCount > 0 && (
         <div className="flex-shrink-0 mt-1">
@@ -238,9 +263,11 @@ function AssistantMessage({
   content,
   block,
   blockReferences,
+  threadBlocks,
 }: AssistantMessageProps) {
   const isFailed = block.properties?.status === "failed";
   const [refCount, setRefCount] = useState<number | null>(null);
+  const [threadBlockUuids, setThreadBlockUuids] = useState<string[]>([]);
 
   // Memoize processed markdown content to prevent re-parsing
   const processedContent = useMemo(
@@ -256,6 +283,20 @@ function AssistantMessage({
         setRefCount(0);
       });
   }, [blockReferences]);
+
+  // Lazily load thread blocks and extract UUIDs (excluding current block)
+  useEffect(() => {
+    threadBlocks
+      .then((blocks) => {
+        const uuids = blocks
+          .map((b) => b.uuid)
+          .filter((uuid) => uuid !== block.uuid);
+        setThreadBlockUuids(uuids);
+      })
+      .catch(() => {
+        setThreadBlockUuids([]);
+      });
+  }, [threadBlocks, block.uuid]);
 
   return (
     <div className="rounded-lg flex items-start gap-3">
@@ -278,6 +319,13 @@ function AssistantMessage({
             </span>
           </div>
         )}
+        {threadBlockUuids.length > 0 && (
+          <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              Alternative threads: {threadBlockUuids.join(", ")}
+            </div>
+          </div>
+        )}
       </div>
       {refCount !== null && refCount > 0 && (
         <div className="flex-shrink-0 mt-1">
@@ -296,7 +344,8 @@ const MemoizedUserMessage = memo(UserMessage, (prevProps, nextProps) => {
     prevProps.content === nextProps.content &&
     prevProps.blockId === nextProps.blockId &&
     prevProps.onEdit === nextProps.onEdit &&
-    prevProps.blockReferences === nextProps.blockReferences
+    prevProps.blockReferences === nextProps.blockReferences &&
+    prevProps.threadBlocks === nextProps.threadBlocks
   );
 });
 
@@ -307,7 +356,8 @@ const MemoizedAssistantMessage = memo(
     return (
       prevProps.content === nextProps.content &&
       prevProps.block === nextProps.block &&
-      prevProps.blockReferences === nextProps.blockReferences
+      prevProps.blockReferences === nextProps.blockReferences &&
+      prevProps.threadBlocks === nextProps.threadBlocks
     );
   }
 );
@@ -422,7 +472,8 @@ export function MessageList({
     // Use requestAnimationFrame to ensure DOM has updated
     requestAnimationFrame(() => {
       if (scrollContainerRef.current) {
-        scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+        scrollContainerRef.current.scrollTop =
+          scrollContainerRef.current.scrollHeight;
       }
     });
   }, []);
@@ -477,8 +528,8 @@ export function MessageList({
       <div
         style={{
           height: `${virtualizer.getTotalSize()}px`,
-          width: '100%',
-          position: 'relative',
+          width: "100%",
+          position: "relative",
         }}
       >
         {messages.length === 0 && !isJobActive && (
@@ -492,10 +543,10 @@ export function MessageList({
               <div
                 key="thinking-indicator"
                 style={{
-                  position: 'absolute',
+                  position: "absolute",
                   top: 0,
                   left: 0,
-                  width: '100%',
+                  width: "100%",
                   transform: `translateY(${virtualItem.start}px)`,
                 }}
               >
@@ -515,10 +566,10 @@ export function MessageList({
               data-index={virtualItem.index}
               ref={virtualizer.measureElement}
               style={{
-                position: 'absolute',
+                position: "absolute",
                 top: 0,
                 left: 0,
-                width: '100%',
+                width: "100%",
                 transform: `translateY(${virtualItem.start}px)`,
               }}
             >
@@ -529,12 +580,14 @@ export function MessageList({
                     blockId={message.block.uuid || ""}
                     onEdit={onEdit || (() => {})}
                     blockReferences={message.blockReferences}
+                    threadBlocks={message.threadBlocks}
                   />
                 ) : (
                   <MemoizedAssistantMessage
                     blockReferences={message.blockReferences}
                     content={message.message.content}
                     block={message.block}
+                    threadBlocks={message.threadBlocks}
                   />
                 )}
               </div>
