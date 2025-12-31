@@ -123,6 +123,36 @@ export type Thread = {
 };
 
 /**
+ * Formats a UUID as a Logseq block reference: ((UUID))
+ */
+export const formatBlockReference = (uuid: string): string => {
+  return `((${uuid}))`;
+};
+
+/**
+ * Parses a block reference string to extract the UUID.
+ * Handles both formats for backward compatibility:
+ * - ((UUID)) - new format (extracts UUID)
+ * - UUID - old format (returns as-is)
+ */
+export const parseBlockReference = (
+  ref: string | undefined
+): string | undefined => {
+  if (!ref || typeof ref !== "string") {
+    return undefined;
+  }
+
+  // Check if it's in the new format ((UUID))
+  const match = ref.match(/^\(\(([^)]+)\)\)$/);
+  if (match) {
+    return match[1];
+  }
+
+  // Otherwise, assume it's the old format (plain UUID) for backward compatibility
+  return ref;
+};
+
+/**
  * Computes a SHA-256 hash of block IDs concatenated in order.
  * Used to validate thread integrity.
  */
@@ -151,8 +181,9 @@ export const extractThreadMetadata = (
 
   const threadId =
     typeof props.threadId === "string" ? props.threadId : undefined;
-  const referenceId =
-    typeof props.referenceId === "string" ? props.referenceId : undefined;
+  const referenceId = parseBlockReference(
+    typeof props.referenceId === "string" ? props.referenceId : undefined
+  );
   const threadHash =
     typeof props.threadHash === "string" ? props.threadHash : undefined;
 
@@ -245,7 +276,12 @@ export const getThreadByThreadId = async (
     : null;
 
   while (withReference) {
-    const referenceId = withReference.properties?.referenceId;
+    const referenceId = parseBlockReference(
+      withReference.properties?.referenceId
+    );
+    if (!referenceId) {
+      break;
+    }
     const predecessorBlocks = await getPredecessorBlocks(referenceId, pageId);
     const blockOfReference = predecessorBlocks.find((block) => {
       return block.uuid === referenceId;
@@ -413,6 +449,130 @@ export const getAlternativeVersions = async (
   }
 
   return alternatives;
+};
+
+/**
+ * Gets all descendant UUIDs of a target block (including the target block itself).
+ * Builds a parent-to-children map and traverses down the tree.
+ */
+const getAllDescendantUuids = (
+  targetBlockId: string,
+  allBlocks: BlockEntity[]
+): Set<string> => {
+  const descendantUuids = new Set<string>();
+  const parentToChildren = new Map<string, BlockEntity[]>();
+
+  // Build parent-to-children map
+  for (const block of allBlocks) {
+    const parentId = block.parent?.uuid || block.parent?.id;
+    if (parentId) {
+      const parentUuid =
+        typeof parentId === "string" ? parentId : String(parentId);
+      if (!parentToChildren.has(parentUuid)) {
+        parentToChildren.set(parentUuid, []);
+      }
+      parentToChildren.get(parentUuid)!.push(block);
+    }
+  }
+
+  // Traverse from target block down to collect all descendants
+  const queue: string[] = [targetBlockId];
+  const visited = new Set<string>();
+
+  while (queue.length > 0) {
+    const currentId = queue.shift()!;
+
+    // Guard against circular references
+    if (visited.has(currentId)) {
+      continue;
+    }
+    visited.add(currentId);
+    descendantUuids.add(currentId);
+
+    // Add all children to the queue
+    const children = parentToChildren.get(currentId) || [];
+    for (const child of children) {
+      queue.push(child.uuid);
+    }
+  }
+
+  return descendantUuids;
+};
+
+/**
+ * Finds all blocks that reference a given block or any of its descendants.
+ * A block references another block if its `referenceId` or `reference-id` property
+ * (parsed from `((UUID))` format) matches the target block's UUID or any descendant UUID.
+ */
+export const getBlocksReferencing = async (
+  blockId: string,
+  pageId: string
+): Promise<BlockEntity[]> => {
+  // Validate that the target block exists and belongs to the page
+  const targetBlock = await logseq.Editor.getBlock(blockId);
+  if (!targetBlock) {
+    throw new Error(`Block with id ${blockId} not found`);
+  }
+
+  // Validate page
+  const page = await logseq.Editor.getPage(pageId);
+  if (!page) {
+    throw new Error(`Page with id ${pageId} not found`);
+  }
+
+  // Guardrail: Validate that the block belongs to the specified pageId
+  const blockPageId =
+    targetBlock.page?.uuid || String(targetBlock.page?.id || "");
+  if (page.id !== targetBlock.page?.id) {
+    throw new Error(
+      `Block ${blockId} does not belong to page ${pageId}. ` +
+        `Block belongs to page ${blockPageId || "unknown"}`
+    );
+  }
+
+  // Get all blocks from the page
+  const allBlocks =
+    ((await logseq.Editor.getPageBlocksTree(
+      pageId
+    )) as Array<BlockEntity> | null) ?? [];
+
+  // Get all descendant UUIDs (including the target block itself)
+  const descendantUuids = getAllDescendantUuids(blockId, allBlocks);
+
+  // Find all blocks that reference the target block or any of its descendants
+  const referencingBlocks: BlockEntity[] = [];
+
+  for (const block of allBlocks) {
+    const props = block.properties;
+    if (!props) {
+      continue;
+    }
+
+    // Check both camelCase and kebab-case property names
+    const referenceIdValue =
+      typeof props.referenceId === "string"
+        ? props.referenceId
+        : typeof props["reference-id"] === "string"
+          ? props["reference-id"]
+          : undefined;
+
+    if (!referenceIdValue) {
+      continue;
+    }
+
+    // Parse the reference (handles both ((UUID)) and plain UUID formats)
+    const parsedReferenceId = parseBlockReference(referenceIdValue);
+    if (!parsedReferenceId) {
+      continue;
+    }
+
+    // Check if the parsed reference matches any descendant UUID
+    if (descendantUuids.has(parsedReferenceId)) {
+      referencingBlocks.push(block);
+    }
+  }
+
+  return referencingBlocks;
 };
 
 /**
@@ -775,7 +935,7 @@ export const appendMessageToThread = async (
 
     // If this is the root of a fork, add referenceId and compute hash
     if (options.referenceId) {
-      properties["reference-id"] = options.referenceId;
+      properties["reference-id"] = formatBlockReference(options.referenceId);
 
       // Compute thread hash from all predecessor blocks (only for fork roots)
       // Get all blocks in the page to find the current position

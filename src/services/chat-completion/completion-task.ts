@@ -23,7 +23,10 @@ import { filter } from "../../utils/async-iterables/filter";
 import type { BlockEntity } from "@logseq/libs/dist/LSPlugin.user";
 import { first } from "../../utils/async-iterables/first";
 import { dumbYesChatbot } from "./chatbots/dumb-say-yes";
-import { computeThreadHash } from "../threading/threading";
+import {
+  computeThreadHash,
+  formatBlockReference,
+} from "../threading/threading";
 
 export function acceptor(ch: (a: unknown, b: unknown) => unknown) {
   return ch(1, 2);
@@ -145,7 +148,9 @@ export const createCompletionJob: (
 
       // If this is the root of a fork, add referenceId and compute hash
       if (options.referenceId) {
-        blockProperties["reference-id"] = options.referenceId;
+        blockProperties["reference-id"] = formatBlockReference(
+          options.referenceId
+        );
 
         // Compute thread hash from all predecessor blocks (only for fork roots)
         // Get all blocks in the page (these are all predecessors since we're appending)
