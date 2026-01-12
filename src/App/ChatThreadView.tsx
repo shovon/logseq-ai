@@ -114,6 +114,7 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
       try {
         // Get current threadId from page properties
         const threadId = await getCurrentThreadId(pageId);
+        console.log("Thread ID", threadId);
         setCurrentThreadIdState(threadId);
 
         // Load messages for the current thread
@@ -204,15 +205,18 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
           })) as Message[];
 
         // Fork a new thread from the edited block
-        const newThreadId = await forkThread(blockId, pageId);
+        // This assigns a synthetic-id to the parent block and returns both threadId and syntheticId
+        const { threadId: newThreadId, syntheticId } = await forkThread(
+          blockId,
+          pageId
+        );
 
         // Set the new thread as the current thread
         await setCurrentThreadId(pageId, newThreadId);
         setCurrentThreadIdState(newThreadId);
 
         // Append the edited message as the root of the new thread fork
-        // This creates a new block that serves as the root with referenceId
-        // pointing to the original block (which remains for record-keeping)
+        // This creates a new block with referenceId pointing to the parent's synthetic-id
         await appendMessageToThread(
           pageId,
           {
@@ -221,7 +225,7 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
           } as Message,
           {
             threadId: newThreadId,
-            referenceId: blockId,
+            referenceId: syntheticId,
           }
         );
 
@@ -231,8 +235,12 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
           content: newContent,
         });
 
+        console.log("About to attempt to load messages");
+
         // Reload messages from the new thread
         await loadMessages();
+
+        console.log("Messages loaded");
 
         // Spawn completion job for assistant reply
         completionJobManager.runJob(pageId, () =>

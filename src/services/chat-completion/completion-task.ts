@@ -23,10 +23,7 @@ import { filter } from "../../utils/async-iterables/filter";
 import type { BlockEntity } from "@logseq/libs/dist/LSPlugin.user";
 import { first } from "../../utils/async-iterables/first";
 import { dumbYesChatbot } from "./chatbots/dumb-say-yes";
-import {
-  computeThreadHash,
-  formatBlockReference,
-} from "../threading/threading";
+import { computeThreadHash } from "../threading/threading";
 
 export function acceptor(ch: (a: unknown, b: unknown) => unknown) {
   return ch(1, 2);
@@ -106,13 +103,18 @@ const streamInImages = async (
     ).value;
 };
 
+/**
+ * Creates a completion job for generating assistant responses.
+ * For forked threads, the referenceId should be the parent block's synthetic-id
+ * stored in plain format (not wrapped in double parentheses).
+ */
 export const createCompletionJob: (
   input: string,
   messages: Message[],
   jobKey: JobKey,
   options?: {
     threadId?: string;
-    referenceId?: string;
+    referenceId?: string; // Synthetic ID of parent block (for fork roots)
   }
 ) => Job<CompletionState, CompletionAction> = (
   input,
@@ -148,9 +150,7 @@ export const createCompletionJob: (
 
       // If this is the root of a fork, add referenceId and compute hash
       if (options.referenceId) {
-        blockProperties["reference-id"] = formatBlockReference(
-          options.referenceId
-        );
+        blockProperties["reference-id"] = options.referenceId;
 
         // Compute thread hash from all predecessor blocks (only for fork roots)
         // Get all blocks in the page (these are all predecessors since we're appending)

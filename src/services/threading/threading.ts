@@ -108,7 +108,7 @@ export type BlockMessage = {
 
 export type ThreadMetadata = {
   threadId?: string; // UUID for forked threads only
-  referenceId?: string; // Block UUID, only on root of forked thread
+  referenceId?: string; // Synthetic ID of parent block (plain format, not wrapped), only on root of forked thread
   threadHash?: string; // SHA-256 hash of predecessor block IDs
 };
 
@@ -119,22 +119,21 @@ export type ThreadedBlock = BlockEntity & {
 export type Thread = {
   threadId: string | null; // null for main thread
   blocks: ThreadedBlock[];
-  referenceId?: string; // Only for forked threads
+  referenceId?: string; // Synthetic ID of parent block (plain format, not wrapped), only for forked threads
   isValid: boolean; // Hash validation result
 };
 
 /**
  * Formats a UUID as a Logseq block reference: ((UUID))
+ * @deprecated No longer used for reference-id properties. Kept for backward compatibility only.
  */
 export const formatBlockReference = (uuid: string): string => {
   return `((${uuid}))`;
 };
 
 /**
- * Parses a block reference string to extract the UUID.
- * Handles both formats for backward compatibility:
- * - ((UUID)) - new format (extracts UUID)
- * - UUID - old format (returns as-is)
+ * Parses a block reference string to extract the ID.
+ * Reference IDs are stored as plain strings without any formatting wrapper.
  */
 export const parseBlockReference = (
   ref: string | undefined
@@ -143,14 +142,100 @@ export const parseBlockReference = (
     return undefined;
   }
 
-  // Check if it's in the new format ((UUID))
-  const match = ref.match(/^\(\(([^)]+)\)\)$/);
-  if (match) {
-    return match[1];
+  return ref;
+};
+
+/**
+ * Resolves a parent block by either synthetic-id or block UUID.
+ * Provides backward compatibility by trying synthetic-id first, then falling back to block UUID.
+ *
+ * @param referenceId - Either a synthetic-id or block UUID
+ * @param pageId - The page UUID to search within
+ * @returns The resolved BlockEntity or null if not found
+ */
+export const resolveParentBlock = async (
+  referenceId: string,
+  pageId: string
+): Promise<BlockEntity | null> => {
+  console.log(`[resolveParentBlock] Looking for synthetic-id:`, referenceId);
+
+  // Get all blocks from the page
+  const allBlocks =
+    ((await logseq.Editor.getPageBlocksTree(
+      pageId
+    )) as Array<BlockEntity> | null) ?? [];
+
+  console.log(`[resolveParentBlock] Total blocks to search:`, allBlocks.length);
+
+  // Log all blocks with synthetic-id for debugging
+  const blocksWithSyntheticId = allBlocks.filter(
+    (b) => b.properties?.["synthetic-id"]
+  );
+  console.log(
+    `[resolveParentBlock] Blocks with synthetic-id:`,
+    blocksWithSyntheticId.map((b) => ({
+      uuid: b.uuid,
+      syntheticId: b.properties?.["synthetic-id"],
+      content: b.content.substring(0, 50),
+    }))
+  );
+
+  // Strategy 1: Try to find by synthetic-id (new format)
+  const bySyntheticId = allBlocks.find(
+    (b) => b.properties?.["synthetic-id"] === referenceId
+  );
+  if (bySyntheticId) {
+    console.log(
+      `[resolveParentBlock] Found by synthetic-id:`,
+      bySyntheticId.uuid
+    );
+    return bySyntheticId;
   }
 
-  // Otherwise, assume it's the old format (plain UUID) for backward compatibility
-  return ref;
+  // Strategy 2: Fall back to block UUID (backward compatibility)
+  const byBlockUuid = allBlocks.find((b) => b.uuid === referenceId);
+  if (byBlockUuid) {
+    console.log(`[resolveParentBlock] Found by block UUID:`, byBlockUuid.uuid);
+    return byBlockUuid;
+  }
+
+  console.log(`[resolveParentBlock] NOT FOUND`);
+  return null;
+};
+
+/**
+ * Assigns a synthetic-id to a block if it doesn't already have one.
+ * This function is idempotent - calling it multiple times on the same block
+ * will return the same synthetic-id without creating duplicates.
+ *
+ * @param blockUuid - The Logseq block UUID
+ * @returns The synthetic-id (either existing or newly generated)
+ */
+export const assignSyntheticId = async (blockUuid: string): Promise<string> => {
+  // Get the block
+  const block = await logseq.Editor.getBlock(blockUuid);
+  if (!block) {
+    throw new Error(`Block ${blockUuid} not found`);
+  }
+
+  // Check if block already has synthetic-id
+  const existingSyntheticId = block.properties?.["synthetic-id"];
+  if (existingSyntheticId && typeof existingSyntheticId === "string") {
+    return existingSyntheticId;
+  }
+
+  // Generate new synthetic-id
+  const syntheticId = crypto.randomUUID();
+
+  // Update block with synthetic-id property
+  await logseq.Editor.updateBlock(block.uuid, block.content, {
+    properties: {
+      ...block.properties,
+      "synthetic-id": syntheticId,
+    },
+  });
+
+  return syntheticId;
 };
 
 /**
@@ -180,13 +265,28 @@ export const extractThreadMetadata = (
     return undefined;
   }
 
+  // Check both camelCase and kebab-case property names
   const threadId =
-    typeof props.threadId === "string" ? props.threadId : undefined;
-  const referenceId = parseBlockReference(
-    typeof props.referenceId === "string" ? props.referenceId : undefined
-  );
+    typeof props.threadId === "string"
+      ? props.threadId
+      : typeof props["thread-id"] === "string"
+        ? props["thread-id"]
+        : undefined;
+
+  const referenceIdRaw =
+    typeof props.referenceId === "string"
+      ? props.referenceId
+      : typeof props["reference-id"] === "string"
+        ? props["reference-id"]
+        : undefined;
+  const referenceId = parseBlockReference(referenceIdRaw);
+
   const threadHash =
-    typeof props.threadHash === "string" ? props.threadHash : undefined;
+    typeof props.threadHash === "string"
+      ? props.threadHash
+      : typeof props["thread-hash"] === "string"
+        ? props["thread-hash"]
+        : undefined;
 
   if (!threadId && !referenceId && !threadHash) {
     return undefined;
@@ -268,51 +368,89 @@ export const getThreadByThreadId = async (
   // Filter blocks that belong to this thread
   let referenceId: string | undefined;
 
+  // Check both camelCase and kebab-case property names
   let threadBlocks: BlockEntity[] = allBlocks.filter(
-    (block) => block.properties?.threadId === threadId
+    (block) =>
+      block.properties?.threadId === threadId ||
+      block.properties?.["thread-id"] === threadId
   );
 
-  let withReference = threadBlocks[0].properties?.referenceId
-    ? threadBlocks[0]
-    : null;
+  console.log(
+    `[getThreadByThreadId] Initial threadBlocks count: ${threadBlocks.length}`
+  );
+  console.log(
+    `[getThreadByThreadId] First block reference-id:`,
+    threadBlocks[0]?.properties?.referenceId ??
+      threadBlocks[0]?.properties?.["reference-id"]
+  );
 
+  // Track visited referenceIds to prevent infinite loops
+  const visitedReferenceIds = new Set<string>();
+
+  // Check both camelCase and kebab-case for initial reference
+  const firstBlockRefId =
+    threadBlocks[0]?.properties?.referenceId ??
+    threadBlocks[0]?.properties?.["reference-id"];
+  let withReference = firstBlockRefId ? threadBlocks[0] : null;
+
+  console.log(
+    `[getThreadByThreadId] withReference is ${withReference ? "set" : "null"}`
+  );
+
+  // Traverse up the graph by following referenceId chains
+  // The whole idea is that we're supposed to traverse up the graph.
+  // Effectively, the idea is that we have something called a "predecessor"
+  // thread, and the root of the predecessor thread is captured in some
+  // `reference-id` block. Get all blocks from the predecessor thread. The
+  // root of the predecessor thread also points to its own predecessor thread
+  // until we have reached the penultimate root.
   while (withReference) {
-    const referenceId = parseBlockReference(
-      withReference.properties?.referenceId
+    const referenceId =
+      withReference.properties?.referenceId ??
+      withReference.properties?.["reference-id"];
+    const targetBlockIndex = allBlocks.findIndex(
+      (block) =>
+        block.properties?.syntheticId === referenceId ||
+        block.properties?.["synthetic-id"] === referenceId
     );
-    if (!referenceId) {
+    const targetBlock = allBlocks[targetBlockIndex];
+    if (!targetBlock) {
+      console.log("[getThreadByThreadId] No target block found");
       break;
-    }
-    const predecessorBlocks = await getPredecessorBlocks(referenceId, pageId);
-    const blockOfReference = predecessorBlocks.find((block) => {
-      return block.uuid === referenceId;
-    });
-    if (!blockOfReference) {
-      break;
-    }
-    if (!blockOfReference.properties?.threadId) {
-      threadBlocks = [
-        ...predecessorBlocks.filter(
-          (block) => !block.properties?.threadId && block.uuid !== referenceId
-        ),
-        ...threadBlocks,
-      ];
     } else {
-      threadBlocks = [
-        ...predecessorBlocks.filter((block) => {
-          return (
-            block.properties?.threadId ===
-              blockOfReference.properties?.threadId &&
-            block.uuid !== referenceId
-          );
-        }),
-        ...threadBlocks,
-      ];
+      console.log("[getThreadByThreadId] Target block", targetBlock);
     }
-    withReference = threadBlocks[0].properties?.referenceId
-      ? threadBlocks[0]
-      : null;
+    threadId =
+      targetBlock.properties?.threadId ??
+      targetBlock.properties?.["thread-id"] ??
+      null;
+    console.log("[getThreadByThreadId] Thread id", threadId);
+    const subThreadBlocks: BlockEntity[] = allBlocks
+      .filter(
+        (block) =>
+          (block.properties?.threadId ?? null) === threadId ||
+          (block.properties?.["thread-id"] ?? null) === threadId
+      )
+      .filter((block) => {
+        if (targetBlockIndex === -1) return true;
+        const blockIndex = allBlocks.indexOf(block);
+        return blockIndex < targetBlockIndex;
+      });
+
+    console.log(subThreadBlocks);
+
+    threadBlocks = [...subThreadBlocks, ...threadBlocks];
+
+    const firstSubThreadBlockRefId =
+      subThreadBlocks[0]?.properties?.referenceId ??
+      subThreadBlocks[0]?.properties?.["reference-id"];
+    withReference = firstSubThreadBlockRefId ? subThreadBlocks[0] : null;
   }
+
+  console.log(
+    `[getThreadByThreadId] Final threadBlocks count: ${threadBlocks.length}`
+  );
+  // console.log(`[getThreadByThreadId] Total loop iterations: ${loopIterations}`);
 
   const isValid =
     threadBlocks.length > 0
@@ -503,8 +641,8 @@ const getAllDescendantUuids = (
 /**
  * Finds all blocks that reference a given block or any of its descendants.
  * A block references another block if its `referenceId` or `reference-id`
- * property (parsed from `((UUID))` format) matches the target block's UUID or
- * any descendant UUID.
+ * property (parsed from `((value))` format) resolves to the target block or
+ * any descendant. Supports both synthetic-id (new format) and block UUID (legacy).
  */
 export const getBlocksReferencing = async (
   blockId: string,
@@ -568,8 +706,14 @@ export const getBlocksReferencing = async (
       continue;
     }
 
-    // Check if the parsed reference matches any descendant UUID
-    if (descendantUuids.has(parsedReferenceId)) {
+    // Resolve the reference to an actual block (handles both synthetic-id and block UUID)
+    const resolvedBlock = await resolveParentBlock(parsedReferenceId, pageId);
+    if (!resolvedBlock) {
+      continue;
+    }
+
+    // Check if the resolved block's UUID is in the descendant UUIDs
+    if (descendantUuids.has(resolvedBlock.uuid)) {
       referencingBlocks.push(block);
     }
   }
@@ -607,10 +751,12 @@ const extractReferenceId = (block: BlockEntity): string | undefined => {
 /**
  * Builds a bidirectional adjacency map from reference-id relationships.
  * Returns a map where each block UUID maps to a Set of connected block UUIDs.
+ * Resolves synthetic IDs to block UUIDs for proper graph construction.
  */
-const buildReferenceGraph = (
-  allBlocks: BlockEntity[]
-): Map<string, Set<string>> => {
+const buildReferenceGraph = async (
+  allBlocks: BlockEntity[],
+  pageId: string
+): Promise<Map<string, Set<string>>> => {
   const graph = new Map<string, Set<string>>();
 
   // Initialize graph with all block UUIDs
@@ -625,12 +771,18 @@ const buildReferenceGraph = (
       continue;
     }
 
+    // Resolve the reference to an actual block (handles both synthetic-id and block UUID)
+    const resolvedBlock = await resolveParentBlock(referencedId, pageId);
+    if (!resolvedBlock) {
+      continue;
+    }
+
     // Only add edge if the referenced block exists in our block set
-    if (graph.has(referencedId)) {
-      // Forward edge: block -> referencedId
-      graph.get(block.uuid)!.add(referencedId);
-      // Reverse edge: referencedId -> block (bidirectional)
-      graph.get(referencedId)!.add(block.uuid);
+    if (graph.has(resolvedBlock.uuid)) {
+      // Forward edge: block -> resolvedBlock
+      graph.get(block.uuid)!.add(resolvedBlock.uuid);
+      // Reverse edge: resolvedBlock -> block (bidirectional)
+      graph.get(resolvedBlock.uuid)!.add(block.uuid);
     }
   }
 
@@ -675,7 +827,7 @@ export const getConnectedBlocksByReference = async (
     )) as Array<BlockEntity> | null) ?? [];
 
   // Build bidirectional reference graph
-  const graph = buildReferenceGraph(allBlocks);
+  const graph = await buildReferenceGraph(allBlocks, pageId);
 
   // Create a block UUID to BlockEntity map for quick lookup
   const blockMap = new Map<string, BlockEntity>();
@@ -729,18 +881,16 @@ export const reconstructThreadFromBlock = async (
   return getThreadByBlockId(blockId, pageId);
 };
 
-// TODO: based on the comment, this does not actually edit anything; just return
-// some "thread ID", but with guardrails.
 /**
  * Creates a new thread fork starting at a reference block.
- * Returns a new threadId (UUID) that should be used when appending
- * messages to this fork. The actual fork is created when the first
- * message is appended with this threadId and the referenceId.
+ * Assigns a synthetic-id to the parent block (idempotent) and returns both
+ * the new threadId and the syntheticId. The actual fork is created when the
+ * first message is appended with this threadId and the syntheticId as referenceId.
  */
 export const forkThread = async (
   referenceBlockId: string,
   pageId: string
-): Promise<string> => {
+): Promise<{ threadId: string; syntheticId: string }> => {
   // Validate that the reference block exists and belongs to the page
   const referenceBlock = await logseq.Editor.getBlock(referenceBlockId);
   if (!referenceBlock) {
@@ -763,10 +913,13 @@ export const forkThread = async (
     );
   }
 
+  // Assign synthetic-id to parent block (idempotent)
+  const syntheticId = await assignSyntheticId(referenceBlockId);
+
   // Generate a new threadId (UUID)
   const threadId = crypto.randomUUID();
 
-  return threadId;
+  return { threadId, syntheticId };
 };
 
 /**
@@ -979,7 +1132,6 @@ export const loadThreadMessageBlocks = async (
     const thread = await getThreadByThreadId(threadId, pageUuid);
     threadBlocks = thread.blocks;
   }
-
   // Filter blocks with role property set to "user" or "assistant"
   const messageBlocks = threadBlocks.filter(
     (block) =>
@@ -1093,12 +1245,17 @@ export const createChatThreadPage = async (
   return page.uuid;
 };
 
+/**
+ * Appends a message to a thread (main or forked).
+ * For forked threads, the referenceId should be the parent block's synthetic-id
+ * stored in plain format (not wrapped in double parentheses).
+ */
 export const appendMessageToThread = async (
   pageUuid: string,
   message: Message,
   options?: {
     threadId?: string;
-    referenceId?: string;
+    referenceId?: string; // Synthetic ID of parent block (for fork roots)
   }
 ): Promise<string> => {
   // Build properties object
@@ -1110,7 +1267,7 @@ export const appendMessageToThread = async (
 
     // If this is the root of a fork, add referenceId and compute hash
     if (options.referenceId) {
-      properties["reference-id"] = formatBlockReference(options.referenceId);
+      properties["reference-id"] = options.referenceId;
 
       // Compute thread hash from all predecessor blocks (only for fork roots)
       // Get all blocks in the page to find the current position
