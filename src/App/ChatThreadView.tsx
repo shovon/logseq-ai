@@ -185,25 +185,37 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
       newContent = sanitizeMarkdown(newContent);
 
       try {
+        // Find the index of the edited block
+        const editedBlockIndex = messages.findIndex(
+          (m) => m.block.uuid === blockId
+        );
+
+        if (editedBlockIndex === -1) {
+          throw new Error(`Block with id ${blockId} not found in messages`);
+        }
+
         // Build prior messages BEFORE forking (from the current thread)
         // We need messages up to (but not including) the edited block
         const priorMessages: Message[] = messages
-          .filter((m) => m.block.uuid !== blockId)
+          .slice(0, editedBlockIndex) // Only messages before the edited one
           .map((m) => ({
             role: m.message.role,
             content: m.message.content,
           })) as Message[];
 
         // Fork a new thread from the edited block
-        const newThreadId = await forkThread(blockId, pageId);
+        // This assigns a synthetic-id to the parent block and returns both threadId and syntheticId
+        const { threadId: newThreadId, syntheticId } = await forkThread(
+          blockId,
+          pageId
+        );
 
         // Set the new thread as the current thread
         await setCurrentThreadId(pageId, newThreadId);
         setCurrentThreadIdState(newThreadId);
 
         // Append the edited message as the root of the new thread fork
-        // This creates a new block that serves as the root with referenceId
-        // pointing to the original block (which remains for record-keeping)
+        // This creates a new block with referenceId pointing to the parent's synthetic-id
         await appendMessageToThread(
           pageId,
           {
@@ -212,7 +224,7 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
           } as Message,
           {
             threadId: newThreadId,
-            referenceId: blockId,
+            referenceId: syntheticId,
           }
         );
 
@@ -239,13 +251,32 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
     [messages, pageId, loadMessages]
   );
 
+  const handleSwitchThread = useCallback(
+    async (threadId: string | null) => {
+      try {
+        // Update the page's current-thread property
+        await setCurrentThreadId(pageId, threadId);
+        setCurrentThreadIdState(threadId);
+
+        // Reload messages for the new thread
+        await loadMessages();
+      } catch (e) {
+        console.error("Error switching thread:", e);
+        logseq.UI.showMsg(`Error switching thread: ${e ?? ""}`, "error");
+      }
+    },
+    [pageId, loadMessages]
+  );
+
   return (
     <>
       <MessageList
         messages={messages}
         isJobActive={isJobActive}
         isStreaming={isStreaming}
+        currentThreadId={currentThreadId}
         onEdit={handleEditMessage}
+        onSwitchThread={handleSwitchThread}
       />
       <ChatInput
         className="mt-auto bg-white dark:bg-logseq-cyan-low-saturation-900 border-t border-gray-200 dark:border-logseq-cyan-low-saturation-800"

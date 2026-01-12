@@ -38,6 +38,7 @@ export class JobManager<Key, State, Action> {
     | { type: "JOB_CREATED" }
     | { type: "JOB_ALREADY_RUNNING" } /*| { type: "FAILED" }*/ {
     if (this.jobs.has(id)) {
+      console.warn("Job is already running");
       // Run job is idempotent.
       return { type: "JOB_ALREADY_RUNNING" };
     }
