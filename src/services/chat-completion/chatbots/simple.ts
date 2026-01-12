@@ -421,7 +421,6 @@ async function* _simpleChatbot(
   messages: Message[],
   abortSignal: AbortSignal
 ): ReturnType<Chatbot> {
-  console.log("Invoking simple chatbot");
   const { enhancedMessage } = await buildEnhancedMessage(input);
 
   const m = [

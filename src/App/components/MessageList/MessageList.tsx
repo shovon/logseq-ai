@@ -14,12 +14,15 @@ import { remarkLogseqPageRefs } from "./remark-logseq-page-refs";
 import { IconPencil, IconAlertTriangle } from "@tabler/icons-react";
 import { BeatLoader } from "react-spinners";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { ThreadCarousel } from "./ThreadCarousel";
 
 interface MessageListProps {
   messages: BlockMessage[];
   isJobActive: boolean;
   isStreaming: boolean;
+  currentThreadId: string | null;
   onEdit?: (blockId: string, newContent: string) => void;
+  onSwitchThread?: (threadId: string | null) => void;
 }
 
 const urlTransform = (url: string) => {
@@ -110,28 +113,46 @@ interface MessageContentProps {
 
 interface AssistantMessageProps extends MessageContentProps {
   block: BlockEntity;
+  currentThreadId: string | null;
 
   // TODO: move this to `MessageContentProps`
   blockReferences: Promise<BlockEntity[]>;
+  threadBlocks: Promise<BlockEntity[]>;
+  onSwitchThread?: (threadId: string | null) => void;
 }
 
 interface UserMessageProps extends MessageContentProps {
   blockId: string;
+  currentThreadId: string | null;
   onEdit: (blockId: string, newContent: string) => void;
   blockReferences: Promise<BlockEntity[]>;
+  threadBlocks: Promise<BlockEntity[]>;
+  onSwitchThread?: (threadId: string | null) => void;
+}
+
+// Type for thread info extracted from blocks
+interface ThreadInfo {
+  blockUuid: string;
+  threadId: string | null;
 }
 
 // User message component for user prompts
 function UserMessage({
   content,
   blockId,
+  currentThreadId,
   onEdit,
   blockReferences,
+  threadBlocks,
+  onSwitchThread,
 }: UserMessageProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(content);
   const [isHovered, setIsHovered] = useState(false);
   const [refCount, setRefCount] = useState<number | null>(null);
+  const [alternativeThreads, setAlternativeThreads] = useState<ThreadInfo[]>(
+    []
+  );
 
   // Memoize processed markdown content to prevent re-parsing
   const processedContent = useMemo(
@@ -147,6 +168,47 @@ function UserMessage({
         setRefCount(0);
       });
   }, [blockReferences]);
+
+  // Lazily load thread blocks and extract thread info (including current block)
+  useEffect(() => {
+    Promise.all([threadBlocks, logseq.Editor.getCurrentPage()])
+      .then(async ([blocks, page]) => {
+        if (!page) {
+          setAlternativeThreads([]);
+          return;
+        }
+
+        // Get all blocks from the page to determine order
+        const allPageBlocks = await logseq.Editor.getPageBlocksTree(page.uuid);
+        if (!allPageBlocks) {
+          setAlternativeThreads([]);
+          return;
+        }
+
+        // Create an index map: blockUuid -> position in page
+        const blockIndexMap = new Map<string, number>();
+        allPageBlocks.forEach((block, index) => {
+          blockIndexMap.set(block.uuid, index);
+        });
+
+        const threads = blocks
+          .map((b) => ({
+            blockUuid: b.uuid,
+            threadId:
+              (b.properties?.threadId as string) ??
+              (b.properties?.["thread-id"] as string) ??
+              null,
+            pageIndex: blockIndexMap.get(b.uuid) ?? Infinity,
+          }))
+          .sort((a, b) => a.pageIndex - b.pageIndex) // Sort by page order
+          .map(({ blockUuid, threadId }) => ({ blockUuid, threadId })); // Remove pageIndex
+
+        setAlternativeThreads(threads);
+      })
+      .catch(() => {
+        setAlternativeThreads([]);
+      });
+  }, [threadBlocks, blockId]);
 
   // Sync editedContent when content prop changes (e.g., after external update)
   useEffect(() => {
@@ -221,6 +283,15 @@ function UserMessage({
             {processedContent}
           </ReactMarkdown>
         </div>
+        {alternativeThreads.length > 1 && (
+          <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+            <ThreadCarousel
+              threads={alternativeThreads}
+              currentThreadId={currentThreadId}
+              onSwitchThread={onSwitchThread}
+            />
+          </div>
+        )}
       </div>
       {refCount !== null && refCount > 0 && (
         <div className="flex-shrink-0 mt-1">
@@ -237,10 +308,16 @@ function UserMessage({
 function AssistantMessage({
   content,
   block,
+  currentThreadId,
   blockReferences,
+  threadBlocks,
+  onSwitchThread,
 }: AssistantMessageProps) {
   const isFailed = block.properties?.status === "failed";
   const [refCount, setRefCount] = useState<number | null>(null);
+  const [alternativeThreads, setAlternativeThreads] = useState<ThreadInfo[]>(
+    []
+  );
 
   // Memoize processed markdown content to prevent re-parsing
   const processedContent = useMemo(
@@ -256,6 +333,47 @@ function AssistantMessage({
         setRefCount(0);
       });
   }, [blockReferences]);
+
+  // Lazily load thread blocks and extract thread info (including current block)
+  useEffect(() => {
+    Promise.all([threadBlocks, logseq.Editor.getCurrentPage()])
+      .then(async ([blocks, page]) => {
+        if (!page) {
+          setAlternativeThreads([]);
+          return;
+        }
+
+        // Get all blocks from the page to determine order
+        const allPageBlocks = await logseq.Editor.getPageBlocksTree(page.uuid);
+        if (!allPageBlocks) {
+          setAlternativeThreads([]);
+          return;
+        }
+
+        // Create an index map: blockUuid -> position in page
+        const blockIndexMap = new Map<string, number>();
+        allPageBlocks.forEach((block, index) => {
+          blockIndexMap.set(block.uuid, index);
+        });
+
+        const threads = blocks
+          .map((b) => ({
+            blockUuid: b.uuid,
+            threadId:
+              (b.properties?.threadId as string) ??
+              (b.properties?.["thread-id"] as string) ??
+              null,
+            pageIndex: blockIndexMap.get(b.uuid) ?? Infinity,
+          }))
+          .sort((a, b) => a.pageIndex - b.pageIndex) // Sort by page order
+          .map(({ blockUuid, threadId }) => ({ blockUuid, threadId })); // Remove pageIndex
+
+        setAlternativeThreads(threads);
+      })
+      .catch(() => {
+        setAlternativeThreads([]);
+      });
+  }, [threadBlocks, block.uuid]);
 
   return (
     <div className="rounded-lg flex items-start gap-3">
@@ -278,6 +396,15 @@ function AssistantMessage({
             </span>
           </div>
         )}
+        {alternativeThreads.length > 1 && (
+          <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+            <ThreadCarousel
+              threads={alternativeThreads}
+              currentThreadId={currentThreadId}
+              onSwitchThread={onSwitchThread}
+            />
+          </div>
+        )}
       </div>
       {refCount !== null && refCount > 0 && (
         <div className="flex-shrink-0 mt-1">
@@ -295,8 +422,11 @@ const MemoizedUserMessage = memo(UserMessage, (prevProps, nextProps) => {
   return (
     prevProps.content === nextProps.content &&
     prevProps.blockId === nextProps.blockId &&
+    prevProps.currentThreadId === nextProps.currentThreadId &&
     prevProps.onEdit === nextProps.onEdit &&
-    prevProps.blockReferences === nextProps.blockReferences
+    prevProps.blockReferences === nextProps.blockReferences &&
+    prevProps.threadBlocks === nextProps.threadBlocks &&
+    prevProps.onSwitchThread === nextProps.onSwitchThread
   );
 });
 
@@ -307,7 +437,10 @@ const MemoizedAssistantMessage = memo(
     return (
       prevProps.content === nextProps.content &&
       prevProps.block === nextProps.block &&
-      prevProps.blockReferences === nextProps.blockReferences
+      prevProps.currentThreadId === nextProps.currentThreadId &&
+      prevProps.blockReferences === nextProps.blockReferences &&
+      prevProps.threadBlocks === nextProps.threadBlocks &&
+      prevProps.onSwitchThread === nextProps.onSwitchThread
     );
   }
 );
@@ -388,7 +521,9 @@ export function MessageList({
   messages,
   isJobActive,
   isStreaming,
+  currentThreadId,
   onEdit,
+  onSwitchThread,
 }: MessageListProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isUserAtBottom, setIsUserAtBottom] = useState<boolean>(true);
@@ -422,7 +557,8 @@ export function MessageList({
     // Use requestAnimationFrame to ensure DOM has updated
     requestAnimationFrame(() => {
       if (scrollContainerRef.current) {
-        scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+        scrollContainerRef.current.scrollTop =
+          scrollContainerRef.current.scrollHeight;
       }
     });
   }, []);
@@ -477,8 +613,8 @@ export function MessageList({
       <div
         style={{
           height: `${virtualizer.getTotalSize()}px`,
-          width: '100%',
-          position: 'relative',
+          width: "100%",
+          position: "relative",
         }}
       >
         {messages.length === 0 && !isJobActive && (
@@ -492,10 +628,10 @@ export function MessageList({
               <div
                 key="thinking-indicator"
                 style={{
-                  position: 'absolute',
+                  position: "absolute",
                   top: 0,
                   left: 0,
-                  width: '100%',
+                  width: "100%",
                   transform: `translateY(${virtualItem.start}px)`,
                 }}
               >
@@ -515,10 +651,10 @@ export function MessageList({
               data-index={virtualItem.index}
               ref={virtualizer.measureElement}
               style={{
-                position: 'absolute',
+                position: "absolute",
                 top: 0,
                 left: 0,
-                width: '100%',
+                width: "100%",
                 transform: `translateY(${virtualItem.start}px)`,
               }}
             >
@@ -527,14 +663,20 @@ export function MessageList({
                   <MemoizedUserMessage
                     content={message.message.content}
                     blockId={message.block.uuid || ""}
+                    currentThreadId={currentThreadId}
                     onEdit={onEdit || (() => {})}
                     blockReferences={message.blockReferences}
+                    threadBlocks={message.threadBlocks}
+                    onSwitchThread={onSwitchThread}
                   />
                 ) : (
                   <MemoizedAssistantMessage
                     blockReferences={message.blockReferences}
                     content={message.message.content}
                     block={message.block}
+                    currentThreadId={currentThreadId}
+                    threadBlocks={message.threadBlocks}
+                    onSwitchThread={onSwitchThread}
                   />
                 )}
               </div>
