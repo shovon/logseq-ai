@@ -42,7 +42,6 @@ export class JobManager<Key, State, Action> {
       // Run job is idempotent.
       return { type: "JOB_ALREADY_RUNNING" };
     }
-    console.log("About to run a new job");
 
     const job = task();
     job.onStopped(() => {

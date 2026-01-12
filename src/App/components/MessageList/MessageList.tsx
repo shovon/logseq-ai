@@ -20,6 +20,7 @@ interface MessageListProps {
   isJobActive: boolean;
   isStreaming: boolean;
   onEdit?: (blockId: string, newContent: string) => void;
+  onSwitchThread?: (threadId: string | null) => void;
 }
 
 const urlTransform = (url: string) => {
@@ -114,6 +115,7 @@ interface AssistantMessageProps extends MessageContentProps {
   // TODO: move this to `MessageContentProps`
   blockReferences: Promise<BlockEntity[]>;
   threadBlocks: Promise<BlockEntity[]>;
+  onSwitchThread?: (threadId: string | null) => void;
 }
 
 interface UserMessageProps extends MessageContentProps {
@@ -121,6 +123,13 @@ interface UserMessageProps extends MessageContentProps {
   onEdit: (blockId: string, newContent: string) => void;
   blockReferences: Promise<BlockEntity[]>;
   threadBlocks: Promise<BlockEntity[]>;
+  onSwitchThread?: (threadId: string | null) => void;
+}
+
+// Type for thread info extracted from blocks
+interface ThreadInfo {
+  blockUuid: string;
+  threadId: string | null;
 }
 
 // User message component for user prompts
@@ -130,12 +139,15 @@ function UserMessage({
   onEdit,
   blockReferences,
   threadBlocks,
+  onSwitchThread,
 }: UserMessageProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(content);
   const [isHovered, setIsHovered] = useState(false);
   const [refCount, setRefCount] = useState<number | null>(null);
-  const [threadBlockUuids, setThreadBlockUuids] = useState<string[]>([]);
+  const [alternativeThreads, setAlternativeThreads] = useState<ThreadInfo[]>(
+    []
+  );
 
   // Memoize processed markdown content to prevent re-parsing
   const processedContent = useMemo(
@@ -152,17 +164,24 @@ function UserMessage({
       });
   }, [blockReferences]);
 
-  // Lazily load thread blocks and extract UUIDs (excluding current block)
+  // Lazily load thread blocks and extract thread info (excluding current block)
   useEffect(() => {
     threadBlocks
       .then((blocks) => {
-        const uuids = blocks
-          .map((b) => b.uuid)
-          .filter((uuid) => uuid !== blockId);
-        setThreadBlockUuids(uuids);
+        console.log(blocks);
+        const threads = blocks
+          .filter((b) => b.uuid !== blockId)
+          .map((b) => ({
+            blockUuid: b.uuid,
+            threadId:
+              (b.properties?.threadId as string) ??
+              (b.properties?.["thread-id"] as string) ??
+              null,
+          }));
+        setAlternativeThreads(threads);
       })
       .catch(() => {
-        setThreadBlockUuids([]);
+        setAlternativeThreads([]);
       });
   }, [threadBlocks, blockId]);
 
@@ -239,10 +258,21 @@ function UserMessage({
             {processedContent}
           </ReactMarkdown>
         </div>
-        {threadBlockUuids.length > 0 && (
+        {alternativeThreads.length > 0 && (
           <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
             <div className="text-xs text-gray-500 dark:text-gray-400">
-              Alternative threads: {threadBlockUuids.join(", ")}
+              Alternative threads:{" "}
+              {alternativeThreads.map((thread, index) => (
+                <span key={thread.blockUuid}>
+                  {index > 0 && ", "}
+                  <button
+                    onClick={() => onSwitchThread?.(thread.threadId)}
+                    className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                  >
+                    {thread.threadId ? thread.threadId.slice(0, 8) : "main"}
+                  </button>
+                </span>
+              ))}
             </div>
           </div>
         )}
@@ -264,10 +294,13 @@ function AssistantMessage({
   block,
   blockReferences,
   threadBlocks,
+  onSwitchThread,
 }: AssistantMessageProps) {
   const isFailed = block.properties?.status === "failed";
   const [refCount, setRefCount] = useState<number | null>(null);
-  const [threadBlockUuids, setThreadBlockUuids] = useState<string[]>([]);
+  const [alternativeThreads, setAlternativeThreads] = useState<ThreadInfo[]>(
+    []
+  );
 
   // Memoize processed markdown content to prevent re-parsing
   const processedContent = useMemo(
@@ -284,17 +317,23 @@ function AssistantMessage({
       });
   }, [blockReferences]);
 
-  // Lazily load thread blocks and extract UUIDs (excluding current block)
+  // Lazily load thread blocks and extract thread info (excluding current block)
   useEffect(() => {
     threadBlocks
       .then((blocks) => {
-        const uuids = blocks
-          .map((b) => b.uuid)
-          .filter((uuid) => uuid !== block.uuid);
-        setThreadBlockUuids(uuids);
+        const threads = blocks
+          .filter((b) => b.uuid !== block.uuid)
+          .map((b) => ({
+            blockUuid: b.uuid,
+            threadId:
+              (b.properties?.threadId as string) ??
+              (b.properties?.["thread-id"] as string) ??
+              null,
+          }));
+        setAlternativeThreads(threads);
       })
       .catch(() => {
-        setThreadBlockUuids([]);
+        setAlternativeThreads([]);
       });
   }, [threadBlocks, block.uuid]);
 
@@ -319,10 +358,21 @@ function AssistantMessage({
             </span>
           </div>
         )}
-        {threadBlockUuids.length > 0 && (
+        {alternativeThreads.length > 0 && (
           <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
             <div className="text-xs text-gray-500 dark:text-gray-400">
-              Alternative threads: {threadBlockUuids.join(", ")}
+              Alternative threads:{" "}
+              {alternativeThreads.map((thread, index) => (
+                <span key={thread.blockUuid}>
+                  {index > 0 && ", "}
+                  <button
+                    onClick={() => onSwitchThread?.(thread.threadId)}
+                    className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                  >
+                    {thread.threadId ? thread.threadId.slice(0, 8) : "main"}
+                  </button>
+                </span>
+              ))}
             </div>
           </div>
         )}
@@ -345,7 +395,8 @@ const MemoizedUserMessage = memo(UserMessage, (prevProps, nextProps) => {
     prevProps.blockId === nextProps.blockId &&
     prevProps.onEdit === nextProps.onEdit &&
     prevProps.blockReferences === nextProps.blockReferences &&
-    prevProps.threadBlocks === nextProps.threadBlocks
+    prevProps.threadBlocks === nextProps.threadBlocks &&
+    prevProps.onSwitchThread === nextProps.onSwitchThread
   );
 });
 
@@ -357,7 +408,8 @@ const MemoizedAssistantMessage = memo(
       prevProps.content === nextProps.content &&
       prevProps.block === nextProps.block &&
       prevProps.blockReferences === nextProps.blockReferences &&
-      prevProps.threadBlocks === nextProps.threadBlocks
+      prevProps.threadBlocks === nextProps.threadBlocks &&
+      prevProps.onSwitchThread === nextProps.onSwitchThread
     );
   }
 );
@@ -439,6 +491,7 @@ export function MessageList({
   isJobActive,
   isStreaming,
   onEdit,
+  onSwitchThread,
 }: MessageListProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isUserAtBottom, setIsUserAtBottom] = useState<boolean>(true);
@@ -581,6 +634,7 @@ export function MessageList({
                     onEdit={onEdit || (() => {})}
                     blockReferences={message.blockReferences}
                     threadBlocks={message.threadBlocks}
+                    onSwitchThread={onSwitchThread}
                   />
                 ) : (
                   <MemoizedAssistantMessage
@@ -588,6 +642,7 @@ export function MessageList({
                     content={message.message.content}
                     block={message.block}
                     threadBlocks={message.threadBlocks}
+                    onSwitchThread={onSwitchThread}
                   />
                 )}
               </div>

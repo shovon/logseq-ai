@@ -114,7 +114,6 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
       try {
         // Get current threadId from page properties
         const threadId = await getCurrentThreadId(pageId);
-        console.log("Thread ID", threadId);
         setCurrentThreadIdState(threadId);
 
         // Load messages for the current thread
@@ -235,12 +234,8 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
           content: newContent,
         });
 
-        console.log("About to attempt to load messages");
-
         // Reload messages from the new thread
         await loadMessages();
-
-        console.log("Messages loaded");
 
         // Spawn completion job for assistant reply
         completionJobManager.runJob(pageId, () =>
@@ -256,6 +251,23 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
     [messages, pageId, loadMessages]
   );
 
+  const handleSwitchThread = useCallback(
+    async (threadId: string | null) => {
+      try {
+        // Update the page's current-thread property
+        await setCurrentThreadId(pageId, threadId);
+        setCurrentThreadIdState(threadId);
+
+        // Reload messages for the new thread
+        await loadMessages();
+      } catch (e) {
+        console.error("Error switching thread:", e);
+        logseq.UI.showMsg(`Error switching thread: ${e ?? ""}`, "error");
+      }
+    },
+    [pageId, loadMessages]
+  );
+
   return (
     <>
       <MessageList
@@ -263,6 +275,7 @@ export function ChatThreadView({ pageId }: ChatThreadViewProps) {
         isJobActive={isJobActive}
         isStreaming={isStreaming}
         onEdit={handleEditMessage}
+        onSwitchThread={handleSwitchThread}
       />
       <ChatInput
         className="mt-auto bg-white dark:bg-logseq-cyan-low-saturation-900 border-t border-gray-200 dark:border-logseq-cyan-low-saturation-800"
